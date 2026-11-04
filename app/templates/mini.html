@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}ミニ表示 - ToDo{% endblock %}
+{% block body_class %}mini-mode{% endblock %}
+{% block header %}
+<header class="mini-header">
+  <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg></span>
+  <span class="mini-date">{{ today_label }}</span>
+  <button type="button" class="header-btn completion-effect-toggle" data-completion-effects-toggle aria-pressed="true">
+    演出 <span data-completion-effects-state>ON</span>
+  </button>
+  <a class="header-btn" href="/" id="back-to-full" title="全体表示が開いたら、ミニ表示を閉じる">全体表示に戻る</a>
+</header>
+{% endblock %}
+{% block content %}
+<form class="quick-add-form mini-add" hx-post="/tasks?view=mini">
+  <div class="quick-add">
+    <input name="title" placeholder="今日やることを追加(Enter)" maxlength="200" autocomplete="off" required aria-label="タスクを追加">
+  </div>
+</form>
+{% include "_mini_content.html" %}
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import progress_summary with context %}
+{% block title %}アーカイブ - ToDo{% endblock %}
+{% block content %}
+<div id="main-content">
+  <div class="section-head">
+    <h2>アーカイブ</h2>
+    <p class="section-note">昨日以前に完了したタスク。子タスクは親が完了するまで「タスク」画面に残ります</p>
+  </div>
+
+  {% if tag_names %}
+  <div class="filter-bar" role="navigation" aria-label="案件で絞り込み">
+    <span class="filter-label">案件</span>
+    <a class="chip filter{{ ' on' if not selected_tag }}" href="/archive">すべて</a>
+    {% for tag_name in tag_names %}
+    <a class="chip filter{{ ' on' if selected_tag == tag_name }}" href="/archive?tag={{ tag_name|urlencode }}">#{{ tag_name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% for group in archive_groups %}
+  <section class="section">
+    <h3 class="archive-date">{{ group.date|month_day }}</h3>
+    <ul class="task-list archive-list">
+      {% for task in group.tasks %}
+      <li class="task depth-{{ task.depth or 0 }}{{ ' last-child' if task.is_last_child }} status-done">
+        <div class="archive-line">
+          {% if not task.subtask_total %}<span class="done-stamp" aria-label="完了">済</span>{% endif %}
+          <span class="title-text">{{ task.title }}</span>
+          {% if task.subtask_total %}{{ progress_summary(task) }}{% endif %}
+          <button type="button" class="task-state-action"
+                  hx-post="/tasks/{{ task.id }}/status/doing?view=archive"
+                  hx-confirm="「{{ task.title }}」を未完了に戻し、タスク画面に戻します。よろしいですか？">未完了に戻す</button>
+          {% for tag_name in task.tags %}<span class="chip tag">#{{ tag_name }}</span>{% endfor %}
+          {% if task.completed_date != group.date.isoformat() %}<span class="done-date">{{ task.completed_date|month_day }} 完了</span>{% endif %}
+          {% if task.total_minutes %}<span class="archive-minutes">累計 {{ task.total_minutes|duration }}</span>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% else %}
+  <p class="empty">アーカイブはまだありません。完了したタスクは翌日からここに移ります。</p>
+  {% endfor %}
+</div>
+{% endblock %}

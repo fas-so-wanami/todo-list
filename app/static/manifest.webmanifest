@@ -1,0 +1,21 @@
+{
+  "name": "ToDo",
+  "short_name": "ToDo",
+  "description": "今日やることと日報をまとめる ToDo",
+  "lang": "ja",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#2b4a9b",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "ミニ表示", "url": "/mini", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "日報", "url": "/report", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

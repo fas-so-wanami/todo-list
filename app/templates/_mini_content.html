@@ -1,0 +1,60 @@
+{% from "_macros.html" import notice_box, progress_controls, child_visibility with context %}
+<div id="main-content" data-refresh-url="/content?view=mini">
+  {{ notice_box(notice) }}
+  <div class="mini-summary">
+    <span>今日やる <b>{{ board.today|length }}</b> 件</span>
+    {% if board.done_today_count %}<span class="done-count">今日完了 {{ board.done_today_count }} 件</span>{% endif %}
+  </div>
+    <ul class="mini-list">
+    {% for task in board.today %}
+    {% set base_url = "/tasks/" ~ task.id %}
+    {% set is_done = task.status == 'done' %}
+    <li class="mini-task depth-{{ task.depth or 0 }} status-{{ task.status }}{{ ' blocked' if task.has_open_blocker }}{{ ' waiting' if task.is_waiting }}{{ ' just-completed' if task.id == just_completed_id or task.id == just_completed_parent_id }}{{ ' just-added' if task.id == just_added_id }}"
+      data-task-id="{{ task.id }}" data-parent-id="{{ task.parent_id or '' }}"
+      data-child-overdue="{{ 'true' if task.is_overdue and not is_done else 'false' }}"
+        data-view-transition-name="mini-task-{{ task.id }}">
+      <div class="mini-body">
+        <div class="mini-title">
+          {% if task.parent_title and not task.depth %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
+          <span class="title-text">{{ task.title }}</span>
+        </div>
+        <div class="mini-meta">
+          {{ progress_controls(task, "view=mini") }}
+          {% if task.due_date and not is_done %}
+          <span class="due{{ ' overdue' if task.is_overdue }}{{ ' today' if task.is_due_today }}">期限 {% if task.is_due_today %}今日{% else %}{{ task.due_date[5:]|replace('-', '/') }}{% endif %}{% if task.is_overdue %} 超過{% endif %}</span>
+          {% endif %}
+          {% if task.has_open_blocker and not is_done %}<span class="chip fusen-chip">相談中</span>{% endif %}
+          {% if task.is_waiting and not is_done %}<span class="chip waiting-chip">返事待ち</span>{% endif %}
+        </div>
+        {{ child_visibility(task) }}
+      </div>
+    </li>
+    {% else %}
+    <li class="empty">今日やるタスクはありません。上の欄から追加できます。</li>
+    {% endfor %}
+  </ul>
+
+  {% if board.done_today %}
+  <details class="done-today-section mini-done-today" id="mini-done-today-section">
+    <summary class="done-today-head">
+      <span class="done-today-title">今日完了したタスク</span>
+      <span class="count">{{ board.done_today_count }} 件</span>
+    </summary>
+    <ul class="done-today-list">
+      {% for task in board.done_today %}
+      <li class="done-today-item">
+        <span class="done-stamp" aria-label="完了">済</span>
+        <span class="done-today-name">{{ task.title }}</span>
+        {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
+        <button type="button" class="report-toggle{{ ' on' if task.is_in_report }}"
+                title="{{ '今日の日報から外す' if task.is_in_report else '今日の日報に入れる' }}"
+                aria-pressed="{{ 'true' if task.is_in_report else 'false' }}"
+                hx-post="/tasks/{{ task.id }}/report?view=mini">日報</button>
+        <button type="button" class="task-state-action done-today-undo"
+                hx-post="/tasks/{{ task.id }}/status/doing?view=mini">未完了に戻す</button>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>

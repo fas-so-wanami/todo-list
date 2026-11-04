@@ -1,0 +1,108 @@
+{% from "_macros.html" import progress_summary with context %}
+{% set date_query = "date=" ~ report.report_date.isoformat() %}
+<div id="main-content" class="report-page">
+  <div class="report-main">
+    <div class="report-head">
+      <h2>日報 {{ report_date_label }}</h2>
+      {% if not is_today %}<a class="back-today" href="/report">今日の日報へ</a>{% endif %}
+    </div>
+    {% if just_submitted %}<div class="notice ok" role="status">提出しました。修正したいときは、そのまま書き換えて「修正を提出する」を押してください。</div>{% endif %}
+
+    <form id="report-form" novalidate method="post" action="/report/submit?{{ date_query }}"
+          hx-post="/report/save?{{ date_query }}" hx-trigger="input delay:600ms, change"
+          hx-target="#report-summary" hx-swap="outerHTML" hx-sync="this:queue all">
+
+      <section class="sheet-section">
+        <div class="section-head">
+          <h3>作業したタスク</h3>
+          <button type="button" class="header-btn report-section-toggle" aria-pressed="{{ 'true' if report.time_tracking_enabled else 'false' }}"
+                  hx-post="/report/toggle-time-tracking?{{ date_query }}" hx-target="#main-content" hx-swap="outerHTML transition:true">
+            作業時間を入力する <span>{{ 'ON' if report.time_tracking_enabled else 'OFF' }}</span>
+          </button>
+        </div>
+        {% if report.task_items %}
+        {% if report.time_tracking_enabled %}
+        <p class="hint">作業時間を「時:分」で入力します(例: 1:30)。入力した内容は自動で下書き保存されます。</p>
+        {% else %}
+        <p class="hint">作業時間の入力はOFFです。入力済みの時間は残ります。</p>
+        {% endif %}
+        <table class="report-table">
+          <thead><tr><th>タスク</th><th>進捗</th>{% if report.time_tracking_enabled %}<th class="time-col">作業時間</th>{% endif %}<th><span class="sr-only">操作</span></th></tr></thead>
+          <tbody>
+            {% for task in report.task_items %}
+            <tr class="{{ 'blocked' if task.has_open_blocker }}" data-view-transition-name="report-item-{{ task.id }}">
+              <td>
+                {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
+                <span class="report-task-title">{{ task.title }}</span>
+                {% if task.has_open_blocker %}<span class="chip fusen-chip">相談中{% if task.blocker_note %}: {{ task.blocker_note }}{% endif %}</span>{% endif %}
+                {% if task.is_waiting %}<span class="chip waiting-chip">返事待ち{% if task.waiting_note %}: {{ task.waiting_note }}{% endif %}</span>{% endif %}
+                {% for tag_name in task.tags %}<span class="chip tag">#{{ tag_name }}</span>{% endfor %}
+              </td>
+              <td>{{ progress_summary(task) }}</td>
+              {% if report.time_tracking_enabled %}
+              <td class="time-col">
+                <input class="time-input" name="time_{{ task.id }}" value="{{ task.report_minutes|hhmm if task.report_minutes else '' }}"
+                       placeholder="0:00" inputmode="numeric" autocomplete="off"
+                       pattern="\s*[0-9０-９]{1,2}(\s*[:：]\s*[0-5０-５]?[0-9０-９])?\s*" aria-label="「{{ task.title }}」の作業時間(時:分)">
+              </td>
+              {% endif %}
+              <td><button type="button" class="text-btn" hx-post="/report/items/{{ task.id }}/remove?{{ date_query }}"
+                          hx-target="#main-content" hx-swap="outerHTML transition:true">外す</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="empty">まだタスクが入っていません。<a href="/">タスク画面</a>で、行の左端の「日報」を押して選んでください。</p>
+        {% endif %}
+      </section>
+
+      <section class="sheet-section report-grid">
+        <div class="section-head">
+          <h3>勤務形態・休暇など</h3>
+          <button type="button" class="header-btn report-section-toggle" aria-pressed="{{ 'true' if report.details_enabled else 'false' }}"
+                  hx-post="/report/toggle-details?{{ date_query }}" hx-target="#main-content" hx-swap="outerHTML transition:true">
+            勤務形態・休暇などを入力する <span>{{ 'ON' if report.details_enabled else 'OFF' }}</span>
+          </button>
+        </div>
+        {% if report.details_enabled %}
+        <label class="telework-field"><input type="checkbox" name="work_style" value="telework" {{ 'checked' if report.work_style == 'telework' }}><span>テレワーク（チェックなし＝出社）</span></label>
+        <fieldset class="leave-group">
+          <legend>休暇など</legend>
+          {% set partial_leave = (report.leave_types | select('in', EXCLUSIVE_LEAVE_TYPES) | first) or '' %}
+          <div class="segmented" role="radiogroup" aria-label="時間休・午前休・午後休(どれか1つ)">
+            <label><input type="radio" name="partial_leave" value="" {{ 'checked' if not partial_leave }}><span>なし</span></label>
+            {% for leave_type in EXCLUSIVE_LEAVE_TYPES %}
+            <label><input type="radio" name="partial_leave" value="{{ leave_type }}" {{ 'checked' if partial_leave == leave_type }}><span>{{ leave_type }}</span></label>
+            {% endfor %}
+          </div>
+          <div class="toggle-group">
+            <label><input type="checkbox" name="leave_types" value="{{ EARLY_LEAVE }}" {{ 'checked' if EARLY_LEAVE in report.leave_types }}><span>{{ EARLY_LEAVE }}</span></label>
+          </div>
+        </fieldset>
+        {% else %}
+        <p class="hint">勤務形態・休暇などの入力はOFFです。入力済みの内容は残り、選ばなくても提出できます。</p>
+        {% endif %}
+        <label class="comment-field">備考・所感
+          <textarea name="comment" rows="5" maxlength="2000" placeholder="今日の所感、困っていることの詳細、明日の予定など">{{ report.comment }}</textarea>
+        </label>
+      </section>
+
+      {% include "_report_summary.html" %}
+    </form>
+  </div>
+
+  {% if recent_reports %}
+  <aside class="report-history" aria-label="最近の日報">
+    <h3>最近の日報</h3>
+    <ul>
+      {% for item in recent_reports %}
+      <li class="{{ 'current' if item.report_date == report.report_date }}">
+        <a href="/report?date={{ item.report_date.isoformat() }}">{{ item.report_date|month_day }}</a>
+        <span class="status-badge s-{{ item.status }}">{{ item.status_label }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </aside>
+  {% endif %}
+</div>

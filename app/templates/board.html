@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% from "_macros.html" import quick_add with context %}
+{% block title %}タスク - ToDo{% endblock %}
+{% block content %}
+{# 入力欄は描き直しの範囲(#main-content)の外に置く。タスクを操作しても、詳しく書く欄の開閉や入力途中の内容が消えない #}
+{{ quick_add(view_query, "今日やることを入力して Enter(例: 見積書作成 #案件A)") }}
+{% include "_board_content.html" %}
+{% endblock %}

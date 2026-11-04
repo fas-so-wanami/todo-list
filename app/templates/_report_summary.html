@@ -1,0 +1,20 @@
+<section id="report-summary" class="report-summary" aria-live="polite">
+  {% if invalid_titles %}
+  <div class="notice error" role="alert">次のタスクの作業時間が読めません。「1:30」のように時:分で入力してください: {{ invalid_titles|join('、') }}</div>
+  {% endif %}
+  {% if report.time_tracking_enabled %}
+  <dl class="time-totals">
+    <div><dt>基本勤務時間</dt><dd>{{ report.base_minutes|hhmm }}</dd></div>
+    <div><dt>作業時間の合計</dt><dd>{{ report.total_minutes|hhmm }}</dd></div>
+    <div class="{{ 'over' if report.overtime_minutes > 0 else ('under' if report.overtime_minutes < 0 else '') }}">
+      <dt>差(残業時間)</dt><dd>{{ report.overtime_minutes|hhmm(signed=true) }}</dd>
+    </div>
+  </dl>
+  {% endif %}
+  <div class="submit-row">
+    <span class="status-badge s-{{ report.status }}">{{ report.status_label }}</span>
+    {% if report.updated_at %}<span class="muted small">自動保存 {{ report.updated_at|clock_time }}</span>{% endif %}
+    {% if report.submitted_at %}<span class="muted small">最終提出 {{ report.submitted_at|month_day }} {{ report.submitted_at|clock_time }}</span>{% endif %}
+    <button type="submit" class="primary large">{{ '修正を提出する' if report.submitted_at else '提出する' }}</button>
+  </div>
+</section>

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ToDo{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ APP_VERSION }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/favicon-32.png" type="image/png">
+  <meta name="theme-color" content="#2b4a9b">
+  <script>
+    // 表示の設定(自動/ライト/ダーク)。画面を描く前に決めて、読み込みの瞬間に白く光らないようにする。
+    try {
+      const savedTheme = localStorage.getItem("todo.theme");
+      if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+    } catch (error) { /* 保存できない環境ではパソコンの設定に合わせる */ }
+    document.documentElement.dataset.completionEffects = "on";
+    try {
+      const savedEffects = localStorage.getItem("todo.completionEffects");
+      if (savedEffects === "off") document.documentElement.dataset.completionEffects = "off";
+    } catch (error) {
+      if (!(error instanceof DOMException)) throw error;
+      console.warn("完了演出の設定を読み込めませんでした。", error);
+      document.documentElement.dataset.completionSettingsUnavailable = "true";
+    }
+  </script>
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}" hx-target="#main-content" hx-swap="outerHTML transition:true">
+  {% block header %}
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a class="brand" href="/" aria-label="ToDo 今日の画面へ">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg>
+        </span>
+        <span class="brand-name">ToDo</span>
+      </a>
+      <nav class="nav" aria-label="画面切り替え">
+        <a href="/" class="{{ 'active' if view == 'board' }}" {{ 'aria-current=page' if view == 'board' }}>タスク</a>
+        <a href="/report" class="{{ 'active' if view == 'report' }}" {{ 'aria-current=page' if view == 'report' }}>日報</a>
+        <a href="/archive" class="{{ 'active' if view == 'archive' }}" {{ 'aria-current=page' if view == 'archive' }}>アーカイブ</a>
+      </nav>
+      <div class="header-tools">
+        <button type="button" class="header-btn completion-effect-toggle" data-completion-effects-toggle aria-pressed="true">
+          完了演出 <span data-completion-effects-state>ON</span>
+        </button>
+        {# ブラウザが「アプリとしてインストール」できる状態のときだけ表示する #}
+        {% if SHOW_INSTALL_BUTTON %}<button type="button" class="header-btn" id="install-app" hidden>アプリとしてインストール</button>{% endif %}
+        <div class="theme-switch" role="group" aria-label="表示の明るさ">
+          <button type="button" data-theme-choice="auto" title="パソコンの設定に合わせる">自動</button>
+          <button type="button" data-theme-choice="light">ライト</button>
+          <button type="button" data-theme-choice="dark">ダーク</button>
+        </div>
+        <button type="button" class="header-btn" id="open-mini" title="今日やるタスクだけを小さな窓で開く">ミニ表示</button>
+        <span class="today-label">{{ today_label }}</span>
+      </div>
+    </div>
+  </header>
+  {% endblock %}
+  <div id="connection-alert" class="connection-alert" role="alert" hidden></div>
+  <aside id="view-handoff" class="view-handoff" role="status" hidden>
+    <p id="view-handoff-message"></p>
+    <button type="button" class="header-btn" id="view-handoff-return">この画面を再開する</button>
+  </aside>
+  <main>{% block content %}{% endblock %}</main>
+  <script>
+    (function () {
+      const alertBox = document.getElementById("connection-alert");
+      function showAlert(message) {
+        alertBox.textContent = message;
+        alertBox.hidden = false;
+      }
+      document.body.addEventListener("htmx:sendError", function () {
+        showAlert("サーバーに接続できません。start.bat の黒いウィンドウが閉じていないか確認し、起動し直してからページを再読み込みしてください。");
+      });
+      document.body.addEventListener("htmx:responseError", function (event) {
+        showAlert("処理に失敗しました(エラー " + event.detail.xhr.status + ")。ページを再読み込みしてもう一度お試しください。");
+      });
+      document.body.addEventListener("htmx:afterRequest", function (event) {
+        if (event.detail.successful) alertBox.hidden = true;
+      });
+
+      // ---- アプリとしてインストール(ブラウザの機能。PC にプログラムは入らない) ----
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(function () { /* 使えない環境ではブラウザのまま使う */ });
+      }
+      let installPrompt = null;
+      const installButton = document.getElementById("install-app");
+      window.addEventListener("beforeinstallprompt", function (event) {
+        event.preventDefault();
+        installPrompt = event;
+        if (installButton) installButton.hidden = false;
+      });
+      if (installButton) {
+        installButton.addEventListener("click", async function () {
+          if (!installPrompt) return;
+          installPrompt.prompt();
+          await installPrompt.userChoice;
+          installPrompt = null;
+          installButton.hidden = true;
+        });
+      }
+      window.addEventListener("appinstalled", function () { if (installButton) installButton.hidden = true; });
+
+      // ---- 表示の切り替え(自動/ライト/ダーク)。選んだものはこのブラウザに覚えさせる ----
+      function applyThemeChoice(choice) {
+        if (choice === "light" || choice === "dark") document.documentElement.dataset.theme = choice;
+        else delete document.documentElement.dataset.theme;
+        document.querySelectorAll("[data-theme-choice]").forEach(function (button) {
+          button.setAttribute("aria-pressed", button.dataset.themeChoice === choice ? "true" : "false");
+        });
+      }
+      let currentTheme = "auto";
+      try { currentTheme = localStorage.getItem("todo.theme") || "auto"; } catch (error) { /* 既定のまま */ }
+      applyThemeChoice(currentTheme);
+      document.querySelectorAll("[data-theme-choice]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          const choice = button.dataset.themeChoice;
+          try { localStorage.setItem("todo.theme", choice); } catch (error) { /* 保存できなくても今の画面には反映する */ }
+          applyThemeChoice(choice);
+        });
+      });
+
+      const completionEffectsKey = "todo.completionEffects";
+      const completionMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      function clearCompletionFeedback() {
+        document.querySelectorAll(".just-completed").forEach(function (row) { row.classList.remove("just-completed"); });
+      }
+      function applyCompletionEffects(enabled) {
+        // 設定をONに戻しただけで、前に完了した行の演出を再生しない。
+        clearCompletionFeedback();
+        document.documentElement.dataset.completionEffects = enabled ? "on" : "off";
+        document.querySelectorAll("[data-completion-effects-toggle]").forEach(function (button) {
+          button.setAttribute("aria-pressed", enabled ? "true" : "false");
+          button.setAttribute("aria-label", "完了演出 " + (enabled ? "ON" : "OFF"));
+          button.title = enabled ? "完了時の演出をOFFにする" : "完了時の演出をONにする";
+          button.querySelector("[data-completion-effects-state]").textContent = enabled ? "ON" : "OFF";
+        });
+      }
+      applyCompletionEffects(document.documentElement.dataset.completionEffects !== "off");
+      if (document.documentElement.dataset.completionSettingsUnavailable) {
+        showAlert("完了演出の設定を読み込めませんでした。今回はONで表示します。");
+      }
+      document.querySelectorAll("[data-completion-effects-toggle]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          const enabled = document.documentElement.dataset.completionEffects === "off";
+          applyCompletionEffects(enabled);
+          try {
+            localStorage.setItem(completionEffectsKey, enabled ? "on" : "off");
+          } catch (error) {
+            if (!(error instanceof DOMException)) throw error;
+            console.warn("完了演出の設定を保存できませんでした。", error);
+            showAlert("完了演出は切り替えましたが、設定を保存できませんでした。再読み込みすると元に戻ります。");
+          }
+        });
+      });
+      window.addEventListener("storage", function (event) {
+        if (event.key === completionEffectsKey || event.key === null) {
+          applyCompletionEffects(event.newValue !== "off");
+        }
+      });
+      document.body.addEventListener("htmx:beforeSwap", function (event) {
+        // htmxが古い行のclassを一時的に引き継いでも、前の判子を再生させない。
+        if (event.detail.target.id === "main-content") clearCompletionFeedback();
+      });
+      document.body.addEventListener("htmx:afterSettle", function () {
+        if (document.documentElement.dataset.completionEffects === "off" || completionMotion.matches) clearCompletionFeedback();
+      });
+      completionMotion.addEventListener("change", function (event) {
+        if (event.matches) clearCompletionFeedback();
+      });
+
+      // 日報の入力欄で Enter を押しても提出しない(書きかけの日報が提出される事故を防ぐ)。
+      // 提出は「提出する」ボタンを押したときだけ。Enter は次の入力欄へ移る。
+      document.body.addEventListener("keydown", function (event) {
+        const field = event.target;
+        if (event.key !== "Enter" || !field.matches || !field.matches("#report-form input")) return;
+        event.preventDefault();
+        const fields = Array.from(document.querySelectorAll("#report-form input.time-input, #report-form textarea"));
+        const position = fields.indexOf(field);
+        if (position >= 0 && fields[position + 1]) fields[position + 1].focus();
+      });
+
+      // タスクを追加できたら、入力欄だけ空に戻す(詳しく書く欄は開いたまま)。
+      document.body.addEventListener("htmx:afterRequest", function (event) {
+        const form = event.detail.elt;
+        if (!form.matches || !form.matches(".quick-add-form") || !event.detail.successful) return;
+        form.reset();
+        form.querySelector("input[name=title]").focus();
+      });
+
+      // タスク画面は操作のたびに描き直すので、開いていた編集欄・一言欄と書きかけの内容を覚えておき、描き直したあとに戻す。
+      // ただし、いま送信した欄(保存した編集欄など)は閉じたままにする。
+      function panelFields(panel) {
+        return Array.from(panel.querySelectorAll("input[name], textarea[name], select[name]"))
+          .filter(function (field) { return field.type !== "radio" && field.type !== "checkbox"; });
+      }
+      let openPanels = null;
+      let lastRequestSource = null;  // いま送信した部品(保存したフォームなど)
+      document.body.addEventListener("htmx:beforeRequest", function (event) { lastRequestSource = event.detail.elt; });
+      document.body.addEventListener("htmx:beforeSwap", function (event) {
+        if (event.detail.target.id !== "main-content") return;
+        const sentFrom = lastRequestSource;
+        openPanels = Array.from(document.querySelectorAll("#main-content details.task-detail[open], #main-content details.row-note[open]"))
+          .filter(function (panel) { return !(sentFrom && panel.contains(sentFrom)); })
+          .map(function (panel) {
+            const row = panel.closest(".task");
+            return {
+              rowId: row && row.id, kind: panel.classList.contains("task-detail") ? "task-detail" : panel.classList.contains("fusen-note") ? "fusen-note" : "wait-note",
+              // 同じ名前の欄が複数ある(タイトルとサブタスク追加はどちらも "title")ので、名前ではなく並び順で覚える
+              values: panelFields(panel).map(function (field) { return field.value; }),
+            };
+          });
+      });
+      document.body.addEventListener("htmx:afterSwap", function () {
+        if (!openPanels) return;
+        openPanels.forEach(function (saved) {
+          const row = saved.rowId && document.getElementById(saved.rowId);
+          const panel = row && row.querySelector("details." + saved.kind);
+          if (!panel) return;
+          panel.open = true;
+          const fields = panelFields(panel);
+          if (fields.length !== saved.values.length) return;  // 欄の数が変わっていたら戻さない(取り違えを防ぐ)
+          fields.forEach(function (field, index) { field.value = saved.values[index]; });
+        });
+        openPanels = null;
+      });
+
+      // 日報の集計(合計・差など)は、値が変わった数字だけ動かして変化に気づけるようにする。
+      let previousTotals = null;
+      document.body.addEventListener("htmx:beforeSwap", function (event) {
+        if (event.detail.target.id !== "report-summary") return;
+        previousTotals = Array.from(event.detail.target.querySelectorAll(".time-totals dd"), function (cell) { return cell.textContent; });
+      });
+      document.body.addEventListener("htmx:afterSwap", function () {
+        if (previousTotals === null) return;
+        document.querySelectorAll("#report-summary .time-totals dd").forEach(function (cell, index) {
+          if (cell.textContent !== previousTotals[index]) cell.classList.add("changed");
+        });
+        previousTotals = null;
+      });
+
+      // 「明日以降にやる」の開閉状態を覚えておき、画面を差し替えても戻す(初期状態は閉じる)。
+      const OTHERS_KEY = "todo.othersOpen";
+      function restoreOthersSection() {
+        const section = document.getElementById("others-section");
+        if (!section) return;
+        try { section.open = localStorage.getItem(OTHERS_KEY) === "1"; } catch (error) { /* 保存できない環境では閉じたまま */ }
+        section.addEventListener("toggle", function () {
+          try { localStorage.setItem(OTHERS_KEY, section.open ? "1" : "0"); } catch (error) { /* 無視 */ }
+        });
+      }
+      restoreOthersSection();
+      document.body.addEventListener("htmx:afterSwap", restoreOthersSection);
+
+      // 別プロセス(一時停止中の Copilot 連携など)からの更新を検知してタスク画面を差し替える。
+      // 入力中・詳細を開いているとき・通信中は、操作の邪魔をしないよう更新を見送る。
+      let knownDataVersion = null;
+      let viewPaused = false;
+      async function fetchDataVersion() {
+        const response = await fetch("/api/data-version", { cache: "no-store" });
+        return (await response.json()).version;
+      }
+      async function rememberCurrentDataVersion() {
+        if (viewPaused) return;
+        try { knownDataVersion = await fetchDataVersion(); } catch (error) { /* サーバー停止中は次回に再試行 */ }
+      }
+      function canRefreshNow() {
+        if (viewPaused) return false;
+        const content = document.getElementById("main-content");
+        if (!content || !content.dataset.refreshUrl || document.visibilityState !== "visible") return false;
+        if (document.querySelector(".task-detail[open], .row-note[open], .htmx-request")) return false;
+        const focused = document.activeElement;
+        const isTyping = focused && focused.matches("input:not([type=radio]):not([type=checkbox]), textarea, select") && focused.value;
+        return !isTyping;
+      }
+      async function refreshIfChangedElsewhere() {
+        if (!canRefreshNow()) return;
+        try {
+          const latestVersion = await fetchDataVersion();
+          if (viewPaused) return;
+          if (knownDataVersion !== null && latestVersion !== knownDataVersion) {
+            const refreshUrl = document.getElementById("main-content").dataset.refreshUrl;
+            htmx.ajax("GET", refreshUrl, { target: "#main-content", swap: "outerHTML transition:true" });
+          }
+          knownDataVersion = latestVersion;
+        } catch (error) { /* サーバー停止中は何もしない(操作時に通知が出る) */ }
+      }
+      // 自分の操作による変更では更新しないよう、操作のたびに基準値を取り直す。
+      document.body.addEventListener("htmx:afterRequest", rememberCurrentDataVersion);
+      rememberCurrentDataVersion();
+      let refreshTimer = window.setInterval(refreshIfChangedElsewhere, 3000);
+      window.addEventListener("todo-view-paused", function (event) {
+        viewPaused = event.detail;
+        window.clearInterval(refreshTimer);
+        if (!viewPaused) {
+          refreshTimer = window.setInterval(refreshIfChangedElsewhere, 3000);
+          refreshIfChangedElsewhere();
+        }
+      });
+    })();
+  </script>
+  <script src="/static/task-visibility.js?v={{ APP_VERSION }}"></script>
+  <script src="/static/window-views.js?v={{ APP_VERSION }}"></script>
+</body>
+</html>

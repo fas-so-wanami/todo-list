@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo','Hiragino Sans',sans-serif">
+  <title>いまの構成(段階①): 1人ずつ、自分のPCの中で動く</title>
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#2b4a9b" stroke-opacity="0.06"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#2b4a9b"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="600" fill="#f4f6f9"/>
+  <rect width="960" height="600" fill="url(#grid)"/>
+
+  <!-- 見出し -->
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#1e2433">いまの構成</text>
+  <rect x="180" y="30" width="118" height="28" rx="14" fill="#2b4a9b"/>
+  <text x="239" y="50" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">段階 ① 個人試作</text>
+  <text x="40" y="84" font-size="16" fill="#4a5266">1人ずつ、自分のPCの中だけで動いています。データは外に出ません。</text>
+
+  <!-- 社員のPC -->
+  <rect x="40" y="110" width="600" height="290" rx="10" fill="#ffffff" stroke="#cfd5df" stroke-width="1.5"/>
+  <rect x="40" y="110" width="600" height="40" rx="10" fill="#e8edf8"/>
+  <rect x="40" y="140" width="600" height="10" fill="#e8edf8"/>
+  <text x="60" y="137" font-size="17" font-weight="700" fill="#2b4a9b">社員のPC(1台)</text>
+
+  <!-- ブラウザ -->
+  <rect x="66" y="176" width="170" height="196" rx="8" fill="#f8f9fb" stroke="#cfd5df"/>
+  <text x="151" y="204" font-size="16" font-weight="700" fill="#1e2433" text-anchor="middle">ブラウザ</text>
+  <text x="151" y="226" font-size="12" fill="#4a5266" text-anchor="middle">Chrome / Edge</text>
+  <g font-size="13" fill="#1e2433">
+    <rect x="84" y="242" width="134" height="24" rx="4" fill="#ffffff" stroke="#e3e7ee"/><text x="151" y="259" text-anchor="middle">タスク</text>
+    <rect x="84" y="272" width="134" height="24" rx="4" fill="#ffffff" stroke="#e3e7ee"/><text x="151" y="289" text-anchor="middle">日報</text>
+    <rect x="84" y="302" width="134" height="24" rx="4" fill="#ffffff" stroke="#e3e7ee"/><text x="151" y="319" text-anchor="middle">アーカイブ</text>
+    <rect x="84" y="332" width="134" height="24" rx="4" fill="#ffffff" stroke="#e3e7ee"/><text x="151" y="349" text-anchor="middle">ミニ表示</text>
+  </g>
+
+  <!-- ToDo サーバー -->
+  <rect x="290" y="176" width="150" height="196" rx="8" fill="#2b4a9b"/>
+  <text x="365" y="214" font-size="16" font-weight="700" fill="#fff" text-anchor="middle">ToDo サーバー</text>
+  <text x="365" y="240" font-size="12" fill="#dbe3f6" text-anchor="middle">start.bat で起動</text>
+  <text x="365" y="260" font-size="12" fill="#dbe3f6" text-anchor="middle">黒いウィンドウ</text>
+  <rect x="306" y="286" width="118" height="26" rx="13" fill="#ffffff" fill-opacity="0.15"/>
+  <text x="365" y="304" font-size="12" fill="#fff" text-anchor="middle">127.0.0.1:8765</text>
+  <text x="365" y="340" font-size="11" fill="#dbe3f6" text-anchor="middle">このPCからだけ</text>
+  <text x="365" y="356" font-size="11" fill="#dbe3f6" text-anchor="middle">開ける</text>
+
+  <!-- データベース -->
+  <g transform="translate(494 190)">
+    <ellipse cx="60" cy="14" rx="60" ry="14" fill="#ffe377" stroke="#e7c443" stroke-width="1.5"/>
+    <path d="M0 14V140A60 14 0 0 0 120 140V14" fill="#ffe377" stroke="#e7c443" stroke-width="1.5"/>
+    <ellipse cx="60" cy="14" rx="60" ry="14" fill="#fff1b8" stroke="#e7c443" stroke-width="1.5"/>
+    <text x="60" y="56" font-size="15" font-weight="700" fill="#5c4600" text-anchor="middle">データ</text>
+    <text x="60" y="76" font-size="12" fill="#5c4600" text-anchor="middle">data\todo.db</text>
+    <text x="60" y="102" font-size="11" fill="#5c4600" text-anchor="middle">タスク・日報</text>
+    <text x="60" y="118" font-size="11" fill="#5c4600" text-anchor="middle">作業時間・相談</text>
+  </g>
+
+  <!-- 矢印 -->
+  <path d="M240 274H286" stroke="#2b4a9b" stroke-width="2.5" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <path d="M444 274H490" stroke="#2b4a9b" stroke-width="2.5" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+
+  <!-- 右側: ポイント -->
+  <g font-size="14" fill="#1e2433">
+    <text x="672" y="136" font-size="16" font-weight="700">ポイント</text>
+    <circle cx="680" cy="168" r="4" fill="#2b4a9b"/><text x="694" y="173">データはこのPCの中だけ</text>
+    <circle cx="680" cy="200" r="4" fill="#2b4a9b"/><text x="694" y="205">インターネットに送らない</text>
+    <circle cx="680" cy="232" r="4" fill="#2b4a9b"/><text x="694" y="237">上司はまだ見られない</text>
+    <circle cx="680" cy="264" r="4" fill="#2b4a9b"/><text x="694" y="269">黒いウィンドウを閉じると</text>
+    <text x="694" y="289">ToDo も止まる</text>
+  </g>
+  <!-- Copilot 連携(一時停止) -->
+  <rect x="672" y="316" width="248" height="84" rx="8" fill="none" stroke="#9aa2b2" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="688" y="344" font-size="14" font-weight="700" fill="#646b7a">Copilot Chat 連携</text>
+  <rect x="824" y="328" width="80" height="22" rx="11" fill="#e9ebf0"/>
+  <text x="864" y="344" font-size="12" fill="#4a5266" text-anchor="middle">一時停止中</text>
+  <text x="688" y="370" font-size="12" fill="#646b7a">話しかけてタスクを更新する機能。</text>
+  <text x="688" y="388" font-size="12" fill="#646b7a">コードは残してある(段階⑤で再開)</text>
+
+  <!-- できていること -->
+  <text x="40" y="446" font-size="17" font-weight="700" fill="#1e2433">できていること</text>
+  <g font-size="13" fill="#1e2433">
+    <rect x="40" y="462" width="196" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="138" y="482" text-anchor="middle">今日やる / 明日以降にやる</text>
+    <rect x="244" y="462" width="132" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="310" y="482" text-anchor="middle">進捗と「済」判子</text>
+    <rect x="384" y="462" width="132" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="450" y="482" text-anchor="middle">期限と期限超過</text>
+    <rect x="524" y="462" width="196" height="30" rx="4" fill="#ffe377" stroke="#e7c443"/><text x="622" y="482" text-anchor="middle" fill="#5c4600">相談したい(理由つき)</text>
+    <rect x="728" y="462" width="192" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="824" y="482" text-anchor="middle">返事待ち(一言メモ)</text>
+
+    <rect x="40" y="500" width="196" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="138" y="520" text-anchor="middle">サブタスク(親子)</text>
+    <rect x="244" y="500" width="272" height="30" rx="4" fill="#fff" stroke="#cfd5df"/>
+    <rect x="306" y="513" width="148" height="9" fill="#ffa64d" fill-opacity="0.45"/><text x="380" y="520" text-anchor="middle">長時間(累計5時間以上)</text>
+    <rect x="524" y="500" width="396" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="722" y="520" text-anchor="middle">日報(時:分・残業・勤務形態・休暇・所感、提出と修正)</text>
+
+    <rect x="40" y="538" width="196" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="138" y="558" text-anchor="middle">アーカイブ</text>
+    <rect x="244" y="538" width="132" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="310" y="558" text-anchor="middle">ミニ表示</text>
+    <rect x="384" y="538" width="132" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="450" y="558" text-anchor="middle">ダークモード</text>
+    <rect x="524" y="538" width="396" height="30" rx="4" fill="#fff" stroke="#cfd5df"/><text x="722" y="558" text-anchor="middle">自動テスト・AI 向け作業指示(AGENTS.md)</text>
+  </g>
+</svg>

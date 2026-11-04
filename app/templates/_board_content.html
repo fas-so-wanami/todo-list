@@ -1,0 +1,66 @@
+{% from "_macros.html" import task_row, task_columns_header, notice_box with context %}
+<div id="main-content" data-refresh-url="/content?{{ view_query }}">
+  {{ notice_box(notice) }}
+
+  {% if tag_names %}
+  <div class="filter-bar" role="navigation" aria-label="案件で絞り込み">
+    <span class="filter-label">案件</span>
+    <a class="chip filter{{ ' on' if not selected_tag }}" href="/">すべて</a>
+    {% for tag_name in tag_names %}
+    <a class="chip filter{{ ' on' if selected_tag == tag_name }}" href="/?tag={{ tag_name|urlencode }}">#{{ tag_name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+    <section class="section board-section">
+    <div class="section-head">
+      <h2>今日やる <span class="count">{{ board.today|length }} 件</span></h2>
+      {% if board.done_today_count %}<span class="done-count" aria-label="今日やったこと">今日完了 {{ board.done_today_count }} 件</span>{% endif %}
+      {% if report_count %}<a class="report-count" href="/report">日報に {{ report_count }} 件</a>{% endif %}
+    </div>
+    {% if board.today %}{{ task_columns_header() }}{% endif %}
+    <ul class="task-list">
+      {% for task in board.today %}{{ task_row(task, view_query, index=loop.index0, in_today=true) }}
+      {% else %}
+      <li class="empty">今日やるタスクはありません。上の入力欄から追加するか、下の「明日以降にやる」で「今日やる」を押してください。</li>
+      {% endfor %}
+    </ul>
+
+    {% if board.done_today %}
+    <details class="done-today-section" id="done-today-section">
+      <summary class="done-today-head">
+        <span class="done-today-title">今日完了したタスク</span>
+        <span class="count">{{ board.done_today_count }} 件</span>
+      </summary>
+      <ul class="done-today-list">
+        {% for task in board.done_today %}
+        <li class="done-today-item">
+          <span class="done-stamp" aria-label="完了">済</span>
+          <span class="done-today-name">{{ task.title }}</span>
+          {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
+          <button type="button" class="report-toggle{{ ' on' if task.is_in_report }}"
+                  title="{{ '今日の日報から外す' if task.is_in_report else '今日の日報に入れる' }}"
+                  aria-pressed="{{ 'true' if task.is_in_report else 'false' }}"
+                  hx-post="/tasks/{{ task.id }}/report?{{ view_query }}">日報</button>
+          <button type="button" class="task-state-action done-today-undo"
+                  hx-post="/tasks/{{ task.id }}/status/doing?{{ view_query }}">未完了に戻す</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </section>
+
+    {% if board.others %}
+  <details class="section board-section others{% if board.done_today %} no-top-border{% endif %}" id="others-section">
+    <summary class="section-head">
+      <h2>明日以降にやる <span class="count">{{ board.others|length }} 件</span></h2>
+      <p class="section-note">期限が近い順</p>
+    </summary>
+    {{ task_columns_header() }}
+    <ul class="task-list">
+      {% for task in board.others %}{{ task_row(task, view_query, index=loop.index0) }}{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>

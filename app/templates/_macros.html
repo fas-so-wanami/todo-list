@@ -1,0 +1,327 @@
+{% macro check_icon() %}<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9" /></svg>{% endmacro %}
+
+{% macro arrow_icon(direction) %}
+{# 段の移動の向き(up = 今日へ / down = 明日以降へ)。絵文字ではなく線で描く #}
+<svg class="icon arrow" viewBox="0 0 24 24" aria-hidden="true">
+  {% if direction == "up" %}<path d="M12 19V6M6 11l6-6 6 6" />{% else %}<path d="M12 5v13M6 13l6 6 6-6" />{% endif %}
+</svg>
+{% endmacro %}
+
+{% macro level_bars(label, level) %}
+<span class="level level-{{ level }}" title="{{ label }}: {{ LEVEL_LABELS[level] }}(変更は「編集」から)">
+  {{ '重要' if label == '重要度' else '緊急' }}：{{ LEVEL_LABELS[level] }}
+</span>
+{% endmacro %}
+
+{% macro child_visibility(task) %}
+{% if task.subtask_total %}
+<div class="child-visibility" data-child-controls="{{ task.id }}">
+  <span class="child-inventory">子タスク {{ task.subtask_total }}件・完了 {{ task.subtask_done }}件</span>
+  <div class="child-modes" role="group" aria-label="{{ task.title }}の子タスク表示">
+    {% for mode, label in [('all', '全部表示'), ('done', '完了だけしまう'), ('none', '全部しまう')] %}
+    <button type="button" data-child-mode="{{ mode }}" aria-pressed="{{ 'true' if mode == 'done' else 'false' }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+  <span class="child-hidden-count" data-child-hidden-count aria-live="polite"></span>
+  <span class="child-alerts" data-child-alerts></span>
+  <span class="child-storage-notice" data-child-storage-notice role="status" hidden></span>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro level_buttons(name, label, current_level) %}
+<fieldset class="field-set">
+  <legend>{{ label }}</legend>
+  <div class="segmented">
+    {% for level, level_label in LEVEL_LABELS.items() %}
+    <label><input type="radio" name="{{ name }}" value="{{ level }}" {{ 'checked' if current_level == level }}><span>{{ level_label }}</span></label>
+    {% endfor %}
+  </div>
+</fieldset>
+{% endmacro %}
+
+{% macro progress_summary(task) %}
+<div class="task-progress">
+  {% if task.subtask_total %}
+  <span class="child-count">{{ task.subtask_done }}/{{ task.subtask_total }}件完了</span>
+  <progress class="child-progress" value="{{ task.subtask_done }}" max="{{ task.subtask_total }}"
+            aria-label="子タスク {{ task.subtask_total }}件中{{ task.subtask_done }}件完了"></progress>
+  {% endif %}
+  <span class="task-status-label" data-task-status="{{ task.status }}">{{ STATUS_LABELS[task.status] }}{% if task.status == 'done' %} <span class="done-stamp" aria-label="完了">済</span>{% endif %}</span>
+</div>
+{% endmacro %}
+
+{% macro progress_controls(task, view_query) %}
+{% set base_url = "/tasks/" ~ task.id %}
+{% if task.subtask_total %}
+<div class="task-progress">
+  {{ progress_summary(task) }}
+  {% if task.status == 'done' %}
+  <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/doing?{{ view_query }}">未完了に戻す</button>
+  {% elif task.subtask_done == task.subtask_total %}
+  <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/done?{{ view_query }}">親も完了にする</button>
+  {% endif %}
+</div>
+{% else %}
+<div class="task-progress state-controls" role="group" aria-label="状態 {{ STATUS_LABELS[task.status] }}">
+  <div class="state-main">
+    <span class="task-status-label" data-task-status="{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
+    {% if task.status == 'todo' %}
+    <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/doing?{{ view_query }}">開始する</button>
+    {% elif task.status == 'doing' %}
+    <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/todo?{{ view_query }}">未着手に戻す</button>
+    {% else %}
+    <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/doing?{{ view_query }}">未完了に戻す</button>
+    {% endif %}
+  </div>
+  {% if task.status == 'done' %}
+  <span class="done-stamp" aria-label="完了">済</span>
+  {% else %}
+  <button type="button" class="task-complete" title="完了(済)にする" aria-label="完了にする"
+          hx-post="{{ base_url }}/status/done?{{ view_query }}">済</button>
+  {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{# 各段の先頭に置く列見出し。行と同じ列幅(--task-columns)で並ぶ #}
+{% macro task_columns_header() %}
+<div class="task-columns" aria-hidden="true">
+  <span>日報</span>
+  <span>進捗・完了</span>
+  <span>タスク</span>
+  <span>期限</span>
+  <span>重要度・緊急性</span>
+  <span>状態</span>
+  <span>取り組む日</span>
+  <span></span>
+</div>
+{% endmacro %}
+
+{% macro task_row(task, view_query, index=0, in_today=false) %}
+{% set base_url = "/tasks/" ~ task.id %}
+{% set is_done = task.status == 'done' %}
+{% set editing = edit_draft and edit_draft.task_id == task.id %}
+{% set edit_values = edit_draft if editing else task %}
+<li id="task-{{ task.id }}" data-view-transition-name="task-{{ task.id }}"
+  data-task-id="{{ task.id }}" data-parent-id="{{ task.parent_id or '' }}"
+  data-child-overdue="{{ 'true' if task.is_overdue and not is_done else 'false' }}"
+    class="task depth-{{ task.depth or 0 }}{{ ' last-child' if task.is_last_child }} status-{{ task.status }}{{ ' blocked' if task.has_open_blocker }}{{ ' waiting' if task.is_waiting }}{{ ' long-running' if task.is_long_running }}{{ ' just-completed' if task.id == just_completed_id or task.id == just_completed_parent_id }}{{ ' just-added' if task.id == just_added_id }}">
+  <div class="task-line">
+    {# 日報: 回覧印のような小さな判子。完了のチェックと形を変えて見分けられるようにする #}
+    <button type="button" class="report-toggle{{ ' on' if task.is_in_report }}"
+            title="{{ '今日の日報から外す' if task.is_in_report else '今日の日報に入れる' }}"
+            aria-pressed="{{ 'true' if task.is_in_report else 'false' }}"
+            hx-post="{{ base_url }}/report?{{ view_query }}">日報</button>
+
+    {{ progress_controls(task, view_query) }}
+
+    <div class="task-main">
+      <div class="task-title">
+        {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
+        <span class="title-text">{{ task.title }}</span>
+        {% for tag_name in task.tags %}<span class="chip tag">#{{ tag_name }}</span>{% endfor %}
+        {% if task.is_long_running %}<span class="chip marker" title="作業時間の累計が5時間以上">累計 {{ task.total_minutes|duration }}</span>{% endif %}
+        {% if is_done and task.completed_date and task.completed_date != today_iso %}<span class="done-date">{{ task.completed_date|month_day }} 完了</span>{% endif %}
+      </div>
+
+      {{ child_visibility(task) }}
+
+      {% if task.has_open_blocker and not is_done %}
+      {# 相談(困りごと): 上司が一番知りたいのは理由。押した直後に付箋を開き、その場で一言書けるようにする #}
+      <details class="row-note fusen-note" {{ 'open' if task.id == just_flagged_id }}>
+        <summary>
+          <span class="note-label">相談中</span>
+          <span class="note-text{{ ' is-blank' if not task.blocker_note }}">{{ task.blocker_note or '理由はまだ書かれていません' }}</span>
+          <span class="note-edit">{{ '直す' if task.blocker_note else '理由を書く' }}</span>
+        </summary>
+        <form class="note-form" hx-post="{{ base_url }}/blocker/note?{{ view_query }}">
+          <p class="note-question">どんなことで詰まっていますか?(書かなくても大丈夫です)</p>
+          <div class="note-presets">
+            {% for preset in ["仕様がわからない", "権限・環境がない", "時間が足りない", "判断に迷っている"] %}
+            <button type="button" onclick="this.form.note.value = this.textContent; this.form.requestSubmit();">{{ preset }}</button>
+            {% endfor %}
+          </div>
+          <div class="note-input-row">
+            <input name="note" value="{{ task.blocker_note }}" maxlength="200" autocomplete="off"
+                   placeholder="例: 単価の根拠がわからない" aria-label="相談したい内容" {{ 'autofocus' if task.id == just_flagged_id }}>
+            <button type="submit" class="primary">保存</button>
+          </div>
+          <p class="note-caution">書いた内容は上司の画面に表示されます。解決したら「解決した」を押してください。</p>
+        </form>
+      </details>
+      {% endif %}
+
+      {% if task.is_waiting and not is_done %}
+      <details class="row-note wait-note" {{ 'open' if task.id == just_waiting_id }}>
+        <summary>
+          <span class="note-label">返事待ち</span>
+          <span class="note-text{{ ' is-blank' if not task.waiting_note }}">{{ task.waiting_note or '待っている相手・内容は未記入' }}</span>
+          <span class="note-since">{{ task.waiting_since|month_day }}から</span>
+          <span class="note-edit">{{ '直す' if task.waiting_note else '書く' }}</span>
+        </summary>
+        <form class="note-form" hx-post="{{ base_url }}/waiting/note?{{ view_query }}">
+          <div class="note-input-row">
+            <input name="note" value="{{ task.waiting_note }}" maxlength="200" autocomplete="off"
+                   placeholder="例: Aさんの返信、見積もりの承認" aria-label="待っている相手・内容" {{ 'autofocus' if task.id == just_waiting_id }}>
+            <button type="submit" class="primary">保存</button>
+          </div>
+          <p class="note-caution">自分用のメモです。上司の画面には出ません。</p>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+
+    <div class="due-cell">
+      {% if task.due_date %}
+      <span class="due{{ ' overdue' if task.is_overdue }}{{ ' today' if task.is_due_today }}">
+        {%- if task.is_due_today %}今日{% else %}{{ task.due_date[5:]|replace('-', '/') }}{% endif %}{% if task.is_overdue %} 超過{% endif -%}
+      </span>
+      {% endif %}
+      {% if task.recurrence_rule %}<span class="recurrence">{{ RECURRENCE_LABELS[task.recurrence_rule] }}</span>{% endif %}
+    </div>
+
+    <div class="level-cell">
+      {{ level_bars("重要度", task.importance) }}
+      {{ level_bars("緊急性", task.urgency) }}
+    </div>
+
+    <div class="state-cell">
+      {% if not is_done %}
+      <button type="button" class="state-btn consult-btn{{ ' on' if task.has_open_blocker }}"
+              title="{{ '相談を終えて付箋を外す' if task.has_open_blocker else '上司に相談したいことを付箋で伝える' }}"
+              aria-pressed="{{ 'true' if task.has_open_blocker else 'false' }}"
+              hx-post="{{ base_url }}/blocker?{{ view_query }}">{{ '解決した' if task.has_open_blocker else '相談したい' }}</button>
+      <button type="button" class="state-btn wait-btn{{ ' on' if task.is_waiting }}"
+              title="{{ '返事が来たので作業を再開する' if task.is_waiting else '他の人の返事などを待っていて、自分では進められないとき' }}"
+              aria-pressed="{{ 'true' if task.is_waiting else 'false' }}"
+              hx-post="{{ base_url }}/waiting?{{ view_query }}">{{ '再開する' if task.is_waiting else '返事待ち' }}</button>
+      {% endif %}
+    </div>
+
+    <div class="move-cell">
+      {% if not is_done and task.depth != 1 %}
+      <button type="button" class="move-btn {{ 'to-later' if in_today else 'to-today' }}"
+              title="{{ '明日以降にやる段へ移す' if in_today else '今日やる段へ移す' }}"
+              hx-post="{{ base_url }}/today?{{ view_query }}">
+        {%- if in_today %}明日以降に{{ arrow_icon("down") }}{% else %}{{ arrow_icon("up") }}今日やる{% endif -%}
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <details class="task-detail" {{ 'open' if editing }}>
+    <summary title="詳細・編集">編集</summary>
+    <div class="detail-body">
+      {% if task.started_at or task.total_minutes %}
+      <div class="time-info">
+        {% if task.started_at %}<span>開始 {{ task.started_at|clock_time }}</span>{% endif %}
+        {% if task.completed_at %}<span>完了 {{ task.completed_at|clock_time }}</span>{% endif %}
+        {% if task.total_minutes %}<span>累計 {{ task.total_minutes|duration }}</span>{% endif %}
+      </div>
+      {% endif %}
+      <form class="edit-form" hx-post="{{ base_url }}/edit?{{ view_query }}" {% if editing %}data-unsaved-draft{% endif %}>
+        <label class="wide">タイトル <input name="title" value="{{ edit_values.title }}" maxlength="200" required></label>
+        {{ level_buttons("importance", "重要度", edit_values.importance) }}
+        {{ level_buttons("urgency", "緊急性", edit_values.urgency) }}
+        <label>期限 <input type="date" name="due_date" value="{{ edit_values.due_date or '' }}"></label>
+        <label>タグ(案件) <input name="tag_text" value="{{ edit_values.tag_text }}" placeholder="案件A 案件B"></label>
+        {% if not task.parent_id %}
+        <label>繰り返し
+          <select name="recurrence_rule">
+            <option value="">なし</option>
+            {% for rule, label in RECURRENCE_LABELS.items() %}
+            <option value="{{ rule }}" {{ 'selected' if edit_values.recurrence_rule == rule }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% else %}
+        <p class="task-parent-note">繰り返しは親側で管理します。{% if task.recurrence_rule %}現在、この子に「{{ RECURRENCE_LABELS[task.recurrence_rule] }}」の旧設定が残っています。{% endif %}</p>
+        {% endif %}
+        {% if not task.subtask_total %}
+        <label>親タスクを選ぶ
+          <select name="parent_id">
+            {% if task.parent_id %}
+            <option value="{{ task.parent_id }}" {{ 'selected' if not editing or edit_values.parent_id == task.parent_id|string }}>{{ task.parent_title }}（現在の親）</option>
+            <option value="" {{ 'selected' if editing and not edit_values.parent_id }}>親から外して独立させる</option>
+            {% else %}
+            <option value="">単独タスクのまま</option>
+            {% for parent in parent_candidates if parent.id != task.id %}
+            <option value="{{ parent.id }}" {{ 'selected' if editing and edit_values.parent_id == parent.id|string }}>{{ parent.title }}（No.{{ parent.id }}）</option>
+            {% endfor %}
+            {% endif %}
+          </select>
+        </label>
+        <p class="task-parent-note">選んで「保存」で反映します。親子は1段だけ。{% if task.parent_id %}別の親へ移す場合はいったん外してください。{% else %}候補は未完了の親だけです。{% endif %}</p>
+        {% endif %}
+        {% if task.recurring_child_count or (task.recurrence_rule and not task.subtask_total) %}
+        <label class="wide task-recurrence-confirm">
+          <input type="checkbox" name="confirm_clear_recurrence" value="true">
+          {% if task.recurring_child_count %}子{{ task.recurring_child_count }}件の個別の繰り返し設定を外し、親側だけで管理することを確認しました
+          {% elif task.parent_id %}この子の繰り返し設定を外すことを確認しました
+          {% else %}子にする場合、このタスクの繰り返し設定を外すことを確認しました{% endif %}
+        </label>
+        {% endif %}
+        <label class="wide">メモ <textarea name="memo" rows="3">{{ edit_values.memo }}</textarea></label>
+        <div class="form-buttons"><button type="submit" class="primary">保存</button></div>
+      </form>
+      {% if not task.parent_id %}
+      <form class="inline-form" hx-post="{{ base_url }}/subtasks?{{ view_query }}">
+        <input name="title" placeholder="＋ サブタスクを追加(Enter)" maxlength="200" autocomplete="off" aria-label="サブタスクを追加">
+      </form>
+      {% endif %}
+      <button type="button" class="danger-link" hx-post="{{ base_url }}/delete?{{ view_query }}"
+              hx-confirm="「{{ task.title }}」を削除します。サブタスクや記録も消えます。よろしいですか?">このタスクを削除</button>
+    </div>
+  </details>
+</li>
+{% endmacro %}
+
+{% macro notice_box(notice) %}
+{% if notice %}
+<div class="notice {{ notice.kind }}" role="status">
+  <span>{{ notice.text }}</span>
+  {% if notice.undo_url %}<button type="button" class="notice-undo" hx-post="{{ notice.undo_url }}">元に戻す</button>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro quick_add(view_query, placeholder) %}
+<form class="quick-add-form" hx-post="/tasks?{{ view_query }}">
+  <div class="quick-add">
+    <input name="title" placeholder="{{ placeholder }}" maxlength="200" autocomplete="off" autofocus required aria-label="タスクを追加">
+    <button type="submit" class="primary">追加</button>
+  </div>
+  <details class="add-more">
+    <summary class="add-more-toggle">
+      <span class="add-more-plus" aria-hidden="true"></span>
+      <span class="add-more-label">詳しく書く</span>
+      <span class="add-more-items" aria-hidden="true">
+        <span>期限</span><span>重要度</span><span>緊急性</span><span>メモ</span><span>追加先</span><span>親タスク</span>
+      </span>
+      <span class="add-more-state" aria-hidden="true"></span>
+    </summary>
+    <div class="add-more-body">
+      <fieldset class="field-set">
+        <legend>追加先</legend>
+        <div class="segmented">
+          <label><input type="radio" name="destination" value="today" checked><span>今日やる</span></label>
+          <label><input type="radio" name="destination" value="later"><span>明日以降にやる</span></label>
+        </div>
+      </fieldset>
+      <label class="field-label">親タスク
+        <select name="parent_id">
+          <option value="">親なし</option>
+          {% for parent in parent_candidates %}
+          <option value="{{ parent.id }}">{{ parent.title }}（No.{{ parent.id }}）</option>
+          {% endfor %}
+        </select>
+      </label>
+      {{ level_buttons("importance", "重要度", 2) }}
+      {{ level_buttons("urgency", "緊急性", 2) }}
+      <label class="field-label">期限 <input type="date" name="due_date"></label>
+      <label class="field-label wide">メモ <textarea name="memo" rows="3" placeholder="背景、手順、確認先など"></textarea></label>
+    </div>
+  </details>
+</form>
+{% endmacro %}

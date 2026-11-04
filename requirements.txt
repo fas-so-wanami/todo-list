@@ -1,0 +1,11 @@
+# Pinned to the versions verified with the test suite. Run all tests before upgrading.
+# NOTE: keep this file ASCII only. pip on Japanese Windows reads it as CP932 and fails on UTF-8 Japanese text.
+fastapi==0.161.1
+starlette==1.9.0
+uvicorn[standard]==0.54.0
+jinja2==3.1.6
+python-multipart==0.0.32
+mcp==2.3.0
+# for tests
+pytest==9.1.1
+httpx==0.28.1

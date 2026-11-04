@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo','Hiragino Sans',sans-serif">
+  <title>目標の構成(段階②〜④): チームで1つのサーバーを使う</title>
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#2b4a9b" stroke-opacity="0.06"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#2b4a9b"/>
+    </marker>
+    <marker id="arrow-shu" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#cf3a28"/>
+    </marker>
+    <g id="person">
+      <circle cx="0" cy="-14" r="10"/>
+      <path d="M-17 16a17 15 0 0 1 34 0z"/>
+    </g>
+  </defs>
+
+  <rect width="960" height="640" fill="#f4f6f9"/>
+  <rect width="960" height="640" fill="url(#grid)"/>
+
+  <!-- 見出し -->
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#1e2433">目標の構成</text>
+  <rect x="180" y="30" width="138" height="28" rx="14" fill="#e8edf8" stroke="#2b4a9b"/>
+  <text x="249" y="50" font-size="14" font-weight="700" fill="#2b4a9b" text-anchor="middle">段階 ②〜④ 未着手</text>
+  <text x="40" y="84" font-size="16" fill="#4a5266">チームで1つのサーバーを使います。各PCにはデータを置かず、ブラウザで開くだけです。</text>
+
+  <!-- 社員 -->
+  <text x="130" y="128" font-size="17" font-weight="700" fill="#1e2433" text-anchor="middle">社員(メンバー)</text>
+  <g fill="#4a5266">
+    <use href="#person" x="80" y="176"/>
+    <use href="#person" x="130" y="176"/>
+    <use href="#person" x="180" y="176"/>
+  </g>
+  <rect x="40" y="206" width="180" height="150" rx="8" fill="#ffffff" stroke="#cfd5df"/>
+  <g font-size="13" fill="#1e2433">
+    <text x="56" y="232" font-weight="700">ブラウザで入力する</text>
+    <text x="56" y="256">・自分のタスク・進捗</text>
+    <text x="56" y="278">・相談したい(理由)</text>
+    <text x="56" y="300">・日報(作業時間など)</text>
+    <text x="56" y="330" fill="#2b4a9b" font-weight="700">見えるのは</text>
+    <text x="56" y="348" fill="#2b4a9b" font-weight="700">自分の分だけ</text>
+  </g>
+
+  <!-- サーバー(Azure) -->
+  <rect x="300" y="110" width="360" height="300" rx="12" fill="#ffffff" stroke="#2b4a9b" stroke-width="2"/>
+  <rect x="300" y="110" width="360" height="44" rx="12" fill="#2b4a9b"/>
+  <rect x="300" y="140" width="360" height="14" fill="#2b4a9b"/>
+  <text x="480" y="139" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">Azure App Service(無料 F1)</text>
+
+  <rect x="322" y="174" width="316" height="52" rx="8" fill="#e8edf8"/>
+  <text x="480" y="197" font-size="15" font-weight="700" fill="#2b4a9b" text-anchor="middle">ログイン(Microsoft 365 のアカウント)</text>
+  <text x="480" y="216" font-size="12" fill="#4a5266" text-anchor="middle">誰が開いたかを判別。パスワードはアプリで持たない</text>
+
+  <rect x="322" y="238" width="150" height="150" rx="8" fill="#2b4a9b"/>
+  <text x="397" y="276" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">ToDo アプリ</text>
+  <text x="397" y="300" font-size="12" fill="#dbe3f6" text-anchor="middle">いまのアプリを</text>
+  <text x="397" y="318" font-size="12" fill="#dbe3f6" text-anchor="middle">そのまま載せる</text>
+  <text x="397" y="350" font-size="12" fill="#dbe3f6" text-anchor="middle">+ 上司画面</text>
+  <text x="397" y="368" font-size="12" fill="#dbe3f6" text-anchor="middle">(段階③で作る)</text>
+
+  <g transform="translate(500 246)">
+    <ellipse cx="60" cy="14" rx="60" ry="14" fill="#ffe377" stroke="#e7c443" stroke-width="1.5"/>
+    <path d="M0 14V120A60 14 0 0 0 120 120V14" fill="#ffe377" stroke="#e7c443" stroke-width="1.5"/>
+    <ellipse cx="60" cy="14" rx="60" ry="14" fill="#fff1b8" stroke="#e7c443" stroke-width="1.5"/>
+    <text x="60" y="54" font-size="15" font-weight="700" fill="#5c4600" text-anchor="middle">全員のデータ</text>
+    <text x="60" y="76" font-size="12" fill="#5c4600" text-anchor="middle">todo.db</text>
+    <text x="60" y="94" font-size="11" fill="#5c4600" text-anchor="middle">(SQLite のファイル)</text>
+    <text x="60" y="112" font-size="11" fill="#5c4600" text-anchor="middle">Azure SQL は不要</text>
+  </g>
+  <path d="M474 313H496" stroke="#2b4a9b" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+
+  <!-- 上司 -->
+  <text x="830" y="128" font-size="17" font-weight="700" fill="#1e2433" text-anchor="middle">上司・役職者(3人)</text>
+  <g fill="#2b4a9b">
+    <use href="#person" x="780" y="176"/>
+    <use href="#person" x="830" y="176"/>
+    <use href="#person" x="880" y="176"/>
+  </g>
+  <rect x="740" y="206" width="180" height="204" rx="8" fill="#ffffff" stroke="#cfd5df"/>
+  <g font-size="13" fill="#1e2433">
+    <text x="756" y="232" font-weight="700">上司画面で察知する</text>
+    <rect x="756" y="244" width="148" height="26" rx="3" fill="#ffffff" stroke="#e3e7ee"/>
+    <rect x="772" y="256" width="116" height="9" fill="#ffa64d" fill-opacity="0.45"/>
+    <text x="830" y="262" text-anchor="middle" font-size="12">長時間(5時間以上)</text>
+    <rect x="756" y="276" width="148" height="26" rx="3" fill="#ffffff" stroke="#e3e7ee"/>
+    <text x="830" y="294" text-anchor="middle" font-size="12" fill="#cf3a28" font-weight="700">期限超過</text>
+    <rect x="756" y="308" width="148" height="26" rx="3" fill="#ffe377" stroke="#e7c443"/>
+    <text x="830" y="326" text-anchor="middle" font-size="12" fill="#5c4600" font-weight="700">相談中(困りごと)と理由</text>
+    <text x="756" y="358" font-size="12" fill="#4a5266">全員分を閲覧できる。</text>
+    <text x="756" y="376" font-size="12" fill="#4a5266">編集は本人だけ。</text>
+    <text x="756" y="396" font-size="12" fill="#4a5266">工数の集計には使わない。</text>
+  </g>
+
+  <!-- 矢印 -->
+  <path d="M222 280H296" stroke="#2b4a9b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="259" y="270" font-size="12" fill="#2b4a9b" text-anchor="middle">入力</text>
+  <path d="M664 300H736" stroke="#cf3a28" stroke-width="2.5" marker-end="url(#arrow-shu)"/>
+  <text x="700" y="290" font-size="12" fill="#cf3a28" text-anchor="middle">察知</text>
+
+  <!-- 下段: ポイント -->
+  <rect x="40" y="440" width="880" height="160" rx="10" fill="#ffffff" stroke="#cfd5df"/>
+  <text x="60" y="472" font-size="16" font-weight="700" fill="#1e2433">いまの構成から変わること</text>
+  <g font-size="14" fill="#1e2433">
+    <circle cx="68" cy="500" r="4" fill="#2b4a9b"/><text x="82" y="505">各PCで start.bat を動かす必要がなくなる。ブラウザで開くだけ</text>
+    <circle cx="68" cy="528" r="4" fill="#2b4a9b"/><text x="82" y="533">アプリの更新はサーバー1か所だけ。全員がすぐ新しい版になる</text>
+    <circle cx="68" cy="556" r="4" fill="#2b4a9b"/><text x="82" y="561">費用は0円(無料枠)。10人でも1日のCPU時間の上限に十分収まる(実測)。使わないと止まり、次は少し待つ</text>
+    <circle cx="68" cy="584" r="4" fill="#2b4a9b"/><text x="82" y="589">他のサービスとは無料枠を取り合わないよう、リソースを分けて置く</text>
+  </g>
+</svg>
