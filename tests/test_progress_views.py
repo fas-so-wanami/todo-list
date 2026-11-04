@@ -60,6 +60,19 @@ def test_mini_action_returns_mini_and_completes_parent(client: TestClient, db_pa
         connection.close()
 
 
+def test_done_today_section_open_state_is_restored_after_content_swap(client: TestClient, db_path: Path) -> None:
+    """通常・ミニ両方で、一覧更新後に完了欄の開閉を復元する処理が読み込まれる。"""
+    seed_family(db_path)
+    for url, section_id in (
+        ("/", "done-today-section"),
+        ("/mini", "mini-done-today-section"),
+    ):
+        html = client.get(url).text
+        assert f'id="{section_id}"' in html
+        assert f'todo.doneTodayOpen." + (document.body.classList.contains("mini-mode") ? "mini" : "board")' in html
+        assert 'document.body.addEventListener("htmx:afterSwap", restoreDoneTodaySection)' in html
+
+
 def test_parent_has_child_visibility_controls_and_readable_levels(client: TestClient, db_path: Path) -> None:
     """親子の表示切り替えが両画面にあり、重要度を文字で読めることを確かめる。"""
     parent, first, second = seed_family(db_path)

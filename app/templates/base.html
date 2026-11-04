@@ -254,6 +254,20 @@
       restoreOthersSection();
       document.body.addEventListener("htmx:afterSwap", restoreOthersSection);
 
+      // 「今日完了したタスク」の開閉状態を覚え、日報などの操作で一覧を描き直しても保つ。
+      const doneTodayKey = "todo.doneTodayOpen." + (document.body.classList.contains("mini-mode") ? "mini" : "board");
+      function restoreDoneTodaySection() {
+        const section = document.querySelector(".done-today-section");
+        if (!section || section.dataset.openStateBound) return;
+        section.dataset.openStateBound = "true";
+        try { section.open = localStorage.getItem(doneTodayKey) === "1"; } catch (error) { /* 保存できない環境では初期状態のまま */ }
+        section.addEventListener("toggle", function () {
+          try { localStorage.setItem(doneTodayKey, section.open ? "1" : "0"); } catch (error) { /* 無視 */ }
+        });
+      }
+      restoreDoneTodaySection();
+      document.body.addEventListener("htmx:afterSwap", restoreDoneTodaySection);
+
       // 別プロセス(一時停止中の Copilot 連携など)からの更新を検知してタスク画面を差し替える。
       // 入力中・詳細を開いているとき・通信中は、操作の邪魔をしないよう更新を見送る。
       let knownDataVersion = null;
