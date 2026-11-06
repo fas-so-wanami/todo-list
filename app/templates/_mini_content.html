@@ -1,4 +1,4 @@
-{% from "_macros.html" import notice_box, progress_controls, child_visibility with context %}
+{% from "_macros.html" import notice_box, progress_controls, child_visibility, memo_chip with context %}
 <div id="main-content" data-refresh-url="/content?view=mini">
   {{ notice_box(notice) }}
   <div class="mini-summary">
@@ -17,6 +17,7 @@
         <div class="mini-title">
           {% if task.parent_title and not task.depth %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
           <span class="title-text">{{ task.title }}</span>
+          {{ memo_chip(task) }}
         </div>
         <div class="mini-meta">
           {{ progress_controls(task, "view=mini") }}
@@ -45,6 +46,7 @@
       <li class="done-today-item">
         <span class="done-stamp" aria-label="完了">済</span>
         <span class="done-today-name">{{ task.title }}</span>
+        {{ memo_chip(task) }}
         {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
         <button type="button" class="report-toggle{{ ' on' if task.is_in_report }}"
                 title="{{ '今日の日報から外す' if task.is_in_report else '今日の日報に入れる' }}"

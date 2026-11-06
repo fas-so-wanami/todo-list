@@ -1,4 +1,4 @@
-{% from "_macros.html" import progress_summary with context %}
+{% from "_macros.html" import progress_summary, memo_chip with context %}
 {% set date_query = "date=" ~ report.report_date.isoformat() %}
 <div id="main-content" class="report-page">
   <div class="report-main">
@@ -34,6 +34,7 @@
               <td>
                 {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
                 <span class="report-task-title">{{ task.title }}</span>
+                {{ memo_chip(task) }}
                 {% if task.has_open_blocker %}<span class="chip fusen-chip">相談中{% if task.blocker_note %}: {{ task.blocker_note }}{% endif %}</span>{% endif %}
                 {% if task.is_waiting %}<span class="chip waiting-chip">返事待ち{% if task.waiting_note %}: {{ task.waiting_note }}{% endif %}</span>{% endif %}
                 {% for tag_name in task.tags %}<span class="chip tag">#{{ tag_name }}</span>{% endfor %}

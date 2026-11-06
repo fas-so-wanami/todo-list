@@ -127,6 +127,7 @@
       function clearCompletionFeedback() {
         document.querySelectorAll(".just-completed").forEach(function (row) { row.classList.remove("just-completed"); });
       }
+      let reportToggleScroll = null;
       function applyCompletionEffects(enabled) {
         // 設定をONに戻しただけで、前に完了した行の演出を再生しない。
         clearCompletionFeedback();
@@ -165,6 +166,13 @@
         if (event.detail.target.id === "main-content") clearCompletionFeedback();
       });
       document.body.addEventListener("htmx:afterSettle", function () {
+        if (reportToggleScroll) {
+          const scrollPosition = reportToggleScroll;
+          reportToggleScroll = null;
+          requestAnimationFrame(function () {
+            window.scrollTo(scrollPosition.x, scrollPosition.y);
+          });
+        }
         if (document.documentElement.dataset.completionEffects === "off" || completionMotion.matches) clearCompletionFeedback();
       });
       completionMotion.addEventListener("change", function (event) {
@@ -180,6 +188,16 @@
         const fields = Array.from(document.querySelectorAll("#report-form input.time-input, #report-form textarea"));
         const position = fields.indexOf(field);
         if (position >= 0 && fields[position + 1]) fields[position + 1].focus();
+      });
+
+      // タスク追加欄のメモ(複数行)で Ctrl+Enter を押したら、改行せずそのままタスクを追加する。
+      // 素の Enter は今まで通り改行(メモの途中で誤って追加されるのを防ぐ)。
+      document.body.addEventListener("keydown", function (event) {
+        const field = event.target;
+        if (event.key !== "Enter" || !event.ctrlKey || !field.matches) return;
+        if (!field.matches(".quick-add-form textarea[name=memo]")) return;
+        event.preventDefault();
+        field.form.requestSubmit();
       });
 
       // タスクを追加できたら、入力欄だけ空に戻す(詳しく書く欄は開いたまま)。
@@ -201,6 +219,9 @@
       document.body.addEventListener("htmx:beforeRequest", function (event) { lastRequestSource = event.detail.elt; });
       document.body.addEventListener("htmx:beforeSwap", function (event) {
         if (event.detail.target.id !== "main-content") return;
+        reportToggleScroll = lastRequestSource && lastRequestSource.matches(".report-toggle")
+          ? { x: window.scrollX, y: window.scrollY }
+          : null;
         const sentFrom = lastRequestSource;
         openPanels = Array.from(document.querySelectorAll("#main-content details.task-detail[open], #main-content details.row-note[open]"))
           .filter(function (panel) { return !(sentFrom && panel.contains(sentFrom)); })

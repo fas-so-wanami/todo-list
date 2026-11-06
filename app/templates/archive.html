@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import progress_summary with context %}
+{% from "_macros.html" import progress_summary, memo_chip with context %}
 {% block title %}アーカイブ - ToDo{% endblock %}
 {% block content %}
 <div id="main-content">
@@ -27,6 +27,7 @@
         <div class="archive-line">
           {% if not task.subtask_total %}<span class="done-stamp" aria-label="完了">済</span>{% endif %}
           <span class="title-text">{{ task.title }}</span>
+          {{ memo_chip(task) }}
           {% if task.subtask_total %}{{ progress_summary(task) }}{% endif %}
           <button type="button" class="task-state-action"
                   hx-post="/tasks/{{ task.id }}/status/doing?view=archive"

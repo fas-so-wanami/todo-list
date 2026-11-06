@@ -13,6 +13,10 @@
 </span>
 {% endmacro %}
 
+{% macro memo_chip(task) %}
+{% if task.memo and task.memo|trim %}<span class="chip memo-chip" title="{{ task.memo }}">メモ</span>{% endif %}
+{% endmacro %}
+
 {% macro child_visibility(task) %}
 {% if task.subtask_total %}
 <div class="child-visibility" data-child-controls="{{ task.id }}">
@@ -121,6 +125,7 @@
         {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
         <span class="title-text">{{ task.title }}</span>
         {% for tag_name in task.tags %}<span class="chip tag">#{{ tag_name }}</span>{% endfor %}
+        {{ memo_chip(task) }}
         {% if task.is_long_running %}<span class="chip marker" title="作業時間の累計が5時間以上">累計 {{ task.total_minutes|duration }}</span>{% endif %}
         {% if is_done and task.completed_date and task.completed_date != today_iso %}<span class="done-date">{{ task.completed_date|month_day }} 完了</span>{% endif %}
       </div>
@@ -320,7 +325,7 @@
       {{ level_buttons("importance", "重要度", 2) }}
       {{ level_buttons("urgency", "緊急性", 2) }}
       <label class="field-label">期限 <input type="date" name="due_date"></label>
-      <label class="field-label wide">メモ <textarea name="memo" rows="3" placeholder="背景、手順、確認先など"></textarea></label>
+      <label class="field-label wide">メモ <textarea name="memo" rows="3" placeholder="背景、手順、確認先など(Ctrl+Enterで追加)"></textarea></label>
     </div>
   </details>
 </form>

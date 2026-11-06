@@ -1,4 +1,4 @@
-{% from "_macros.html" import task_row, task_columns_header, notice_box with context %}
+{% from "_macros.html" import task_row, task_columns_header, notice_box, memo_chip with context %}
 <div id="main-content" data-refresh-url="/content?{{ view_query }}">
   {{ notice_box(notice) }}
 
@@ -37,6 +37,7 @@
         <li class="done-today-item">
           <span class="done-stamp" aria-label="完了">済</span>
           <span class="done-today-name">{{ task.title }}</span>
+          {{ memo_chip(task) }}
           {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
           <button type="button" class="report-toggle{{ ' on' if task.is_in_report }}"
                   title="{{ '今日の日報から外す' if task.is_in_report else '今日の日報に入れる' }}"
