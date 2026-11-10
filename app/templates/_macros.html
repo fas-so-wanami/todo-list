@@ -88,14 +88,26 @@
 {% endif %}
 {% endmacro %}
 
+{% macro task_sort_button(label, field) %}
+<button type="button" class="task-sort-button" data-task-sort="{{ field }}"
+        aria-pressed="{{ 'true' if field == 'due' else 'false' }}"
+        aria-label="{{ label }}で並べ替え" title="{{ label }}で並べ替え">
+  <span>{{ label }}</span>
+  <span class="task-sort-indicator" aria-hidden="true">{{ '↑' if field == 'due' else '↕' }}</span>
+</button>
+{% endmacro %}
+
 {# 各段の先頭に置く列見出し。行と同じ列幅(--task-columns)で並ぶ #}
 {% macro task_columns_header() %}
-<div class="task-columns" aria-hidden="true">
+<div class="task-columns">
   <span>日報</span>
-  <span>進捗・完了</span>
-  <span>タスク</span>
-  <span>期限</span>
-  <span>重要度・緊急性</span>
+  <span>{{ task_sort_button("進捗", "progress") }}</span>
+  <span>{{ task_sort_button("タスク", "title") }}</span>
+  <span>{{ task_sort_button("期限", "due") }}</span>
+  <span class="task-sort-levels">
+    {{ task_sort_button("重要度", "importance") }}
+    {{ task_sort_button("緊急性", "urgency") }}
+  </span>
   <span>状態</span>
   <span>取り組む日</span>
   <span></span>
@@ -105,10 +117,14 @@
 {% macro task_row(task, view_query, index=0, in_today=false) %}
 {% set base_url = "/tasks/" ~ task.id %}
 {% set is_done = task.status == 'done' %}
+{% set sort_progress = task.subtask_done / task.subtask_total if task.subtask_total else (1 if task.status == 'done' else 0.5 if task.status == 'doing' else 0) %}
 {% set editing = edit_draft and edit_draft.task_id == task.id %}
 {% set edit_values = edit_draft if editing else task %}
 <li id="task-{{ task.id }}" data-view-transition-name="task-{{ task.id }}"
   data-task-id="{{ task.id }}" data-parent-id="{{ task.parent_id or '' }}"
+  data-sort-progress="{{ sort_progress }}" data-sort-due="{{ task.due_date or '' }}"
+  data-sort-importance="{{ task.importance }}" data-sort-urgency="{{ task.urgency }}"
+  data-sort-title="{{ task.title }}" data-sort-waiting="{{ '1' if task.is_waiting else '0' }}"
   data-child-overdue="{{ 'true' if task.is_overdue and not is_done else 'false' }}"
     class="task depth-{{ task.depth or 0 }}{{ ' last-child' if task.is_last_child }} status-{{ task.status }}{{ ' blocked' if task.has_open_blocker }}{{ ' waiting' if task.is_waiting }}{{ ' long-running' if task.is_long_running }}{{ ' just-completed' if task.id == just_completed_id or task.id == just_completed_parent_id }}{{ ' just-added' if task.id == just_added_id }}">
   <div class="task-line">

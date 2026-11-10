@@ -231,6 +231,7 @@ def test_quick_add_can_create_child_in_parent_section(
         ).fetchone()
         assert child is not None
         assert owned_row(connection, child["id"])["parent_id"] == parent
+        assert owned_row(connection, child["id"])["due_date"] is None
         board = daily.build_board(connection, 1, set())
         assert any(task["id"] == child["id"] for task in board[expected_section])
     finally:

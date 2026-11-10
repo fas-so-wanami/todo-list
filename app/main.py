@@ -397,10 +397,11 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             candidate_ids = {parent["id"] for parent in tasks.list_parent_candidates(db, user_id)}
             if selected_parent_id not in candidate_ids:
                 return render_board(request, db, state, {"kind": "warn", "text": "選んだ親タスクは追加先にできません。画面を読み直してください。"})
+        selected_due_date = due_date or (None if selected_parent_id is not None else clock.today().isoformat())
         task_id = tasks.create_task(
             db, user_id, task_title[:200], parent_id=selected_parent_id, tag_names=tag_names,
             importance=tasks.clamp_level(importance), urgency=tasks.clamp_level(urgency),
-            due_date=due_date, memo=memo.strip()[:tasks.MAX_MEMO_LENGTH],
+            due_date=selected_due_date, memo=memo.strip()[:tasks.MAX_MEMO_LENGTH],
         )
         if selected_parent_id is not None:
             today_candidate_ids = {task["id"] for task in daily.list_candidates(db, user_id)}

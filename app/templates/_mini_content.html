@@ -9,8 +9,12 @@
     {% for task in board.today %}
     {% set base_url = "/tasks/" ~ task.id %}
     {% set is_done = task.status == 'done' %}
+    {% set sort_progress = task.subtask_done / task.subtask_total if task.subtask_total else (1 if task.status == 'done' else 0.5 if task.status == 'doing' else 0) %}
     <li class="mini-task depth-{{ task.depth or 0 }} status-{{ task.status }}{{ ' blocked' if task.has_open_blocker }}{{ ' waiting' if task.is_waiting }}{{ ' just-completed' if task.id == just_completed_id or task.id == just_completed_parent_id }}{{ ' just-added' if task.id == just_added_id }}"
       data-task-id="{{ task.id }}" data-parent-id="{{ task.parent_id or '' }}"
+      data-sort-progress="{{ sort_progress }}" data-sort-due="{{ task.due_date or '' }}"
+      data-sort-importance="{{ task.importance }}" data-sort-urgency="{{ task.urgency }}"
+      data-sort-title="{{ task.title }}" data-sort-waiting="{{ '1' if task.is_waiting else '0' }}"
       data-child-overdue="{{ 'true' if task.is_overdue and not is_done else 'false' }}"
         data-view-transition-name="mini-task-{{ task.id }}">
       <div class="mini-body">

@@ -60,6 +60,37 @@ def test_mini_action_returns_mini_and_completes_parent(client: TestClient, db_pa
         connection.close()
 
 
+def test_board_defaults_to_due_date_order_in_both_sections(db) -> None:
+    today = date(2026, 10, 29)
+    today_later = tasks.create_task(db, 1, "今日・期限後", due_date="2026-10-31", importance=1)
+    today_sooner = tasks.create_task(db, 1, "今日・期限前", due_date="2026-10-30", importance=3)
+    today_without_due = tasks.create_task(db, 1, "今日・期限なし")
+    later_sooner = tasks.create_task(db, 1, "後日・期限前", due_date="2026-11-01")
+    later_later = tasks.create_task(db, 1, "後日・期限後", due_date="2026-11-03")
+    later_without_due = tasks.create_task(db, 1, "後日・期限なし")
+    daily.add_to_plan(db, today_later, today)
+    daily.add_to_plan(db, today_sooner, today)
+    daily.add_to_plan(db, today_without_due, today)
+
+    board = daily.build_board(db, 1, set())
+
+    assert [task["title"] for task in board["today"]] == ["今日・期限前", "今日・期限後", "今日・期限なし"]
+    assert [task["title"] for task in board["others"]] == ["後日・期限前", "後日・期限後", "後日・期限なし"]
+
+
+def test_quick_add_uses_today_when_due_date_is_blank(client: TestClient, db_path: Path) -> None:
+    client.post("/tasks", data={"title": "期限欄を空にして追加", "due_date": ""})
+    connection = database.connect(db_path)
+    try:
+        task = connection.execute(
+            "SELECT due_date FROM tasks WHERE user_id = ? AND title = ?",
+            (1, "期限欄を空にして追加"),
+        ).fetchone()
+        assert task["due_date"] == "2026-10-29"
+    finally:
+        connection.close()
+
+
 def test_done_today_section_open_state_is_restored_after_content_swap(client: TestClient, db_path: Path) -> None:
     """通常・ミニ両方で、一覧更新後に完了欄の開閉を復元する処理が読み込まれる。"""
     seed_family(db_path)
@@ -95,8 +126,9 @@ def test_parent_has_child_visibility_controls_and_readable_levels(client: TestCl
     assert "data-child-controls" not in client.get("/archive").text
 
 
-def test_child_visibility_script_is_served_to_both_views(client: TestClient) -> None:
+def test_child_visibility_script_is_served_to_both_views(client: TestClient, db_path: Path) -> None:
     """通常とミニで同じ開閉処理を使い、更新後も新しいコードが届くことを確かめる。"""
+    seed_family(db_path)
     for url in ("/", "/mini"):
         html = client.get(url).text
         scripts = re.findall(r'<script src="(/static/task-visibility.js\?v=[^"]+)"></script>', html)
@@ -104,6 +136,15 @@ def test_child_visibility_script_is_served_to_both_views(client: TestClient) -> 
         response = client.get(scripts[0])
         assert response.status_code == 200
         assert "javascript" in response.headers["content-type"]
+        sort_scripts = re.findall(r'<script src="(/static/task-sort.js\?v=[^"]+)"></script>', html)
+        assert len(sort_scripts) == 1
+        sort_response = client.get(sort_scripts[0])
+        assert sort_response.status_code == 200
+        assert 'new Intl.Collator("ja"' in sort_response.text
+        assert 'todo.taskSort' in sort_response.text
+    board_html = client.get("/").text
+    for field in ("progress", "title", "due", "importance", "urgency"):
+        assert f'data-task-sort="{field}"' in board_html
 
 
 def test_hidden_child_attention_and_level_labels_are_available(client: TestClient, db_path: Path) -> None:

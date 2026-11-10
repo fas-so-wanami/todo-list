@@ -208,13 +208,15 @@ def build_board(
         task["is_in_report"] = task["id"] in report_task_ids
         task["completed_date"] = (task["completed_at"] or "")[:10] or None
 
+    def due_sort_key(task: dict) -> tuple:
+        return (task["due_date"] is None, task["due_date"] or "",
+                -(task["importance"] + task["urgency"]), task["id"])
+
     def today_sort_key(task: dict) -> tuple:
-        return (task["is_waiting"], *tasks.sort_key(task, today_iso))
+        return (task["is_waiting"], *due_sort_key(task))
 
     def other_sort_key(task: dict) -> tuple:
-        """明日以降にやるは期限が近い順。期限なしは最後に、重要度+緊急性の順で並べる。"""
-        return (task["is_waiting"], task["due_date"] or "9999-12-31",
-                -(task["importance"] + task["urgency"]), task["id"])
+        return (task["is_waiting"], *due_sort_key(task))
 
     # 当日完了した全タスクをフラットに並べる(親子関係なく、完了時刻順)。
     # today_tasks の中だけでなく list_done_today の全件を使うことで、
@@ -228,8 +230,8 @@ def build_board(
         task["completed_date"] = (task["completed_at"] or "")[:10] or None
 
     return {
-        "today": tasks.arrange_as_tree(today_tasks, today_sort_key, lambda child: child["id"]),
-        "others": tasks.arrange_as_tree(other_tasks, other_sort_key, lambda child: child["id"]),
+        "today": tasks.arrange_as_tree(today_tasks, today_sort_key, today_sort_key),
+        "others": tasks.arrange_as_tree(other_tasks, other_sort_key, other_sort_key),
         "done_today_count": len(done_today_flat),
         "done_today": done_today_flat,
     }
