@@ -40,6 +40,11 @@ def test_board_mini_report_share_counts_without_percent(client: TestClient, db_p
     assert f"/tasks/{parent}/status/" not in html
     assert f"/tasks/{second}/status/doing" in html
     assert f"/tasks/{first}/status/doing" in html
+    assert 'class="task-state-action start-task"' in html
+    assert "作業を始める" in html
+    mini_html = client.get("/mini").text
+    assert 'class="task-state-action start-task"' in mini_html
+    assert "作業を始める" in mini_html
 
 
 def test_mini_action_returns_mini_and_completes_parent(client: TestClient, db_path: Path) -> None:
@@ -83,10 +88,88 @@ def test_quick_add_uses_today_when_due_date_is_blank(client: TestClient, db_path
     connection = database.connect(db_path)
     try:
         task = connection.execute(
-            "SELECT due_date FROM tasks WHERE user_id = ? AND title = ?",
+            "SELECT due_date, start_date FROM tasks WHERE user_id = ? AND title = ?",
             (1, "期限欄を空にして追加"),
         ).fetchone()
         assert task["due_date"] == "2026-10-29"
+        assert task["start_date"] == "2026-10-29"
+    finally:
+        connection.close()
+
+
+def test_start_date_defaults_on_add_and_can_be_cleared_on_edit(client: TestClient, db_path: Path) -> None:
+    """新規追加の空欄は当日にし、既存タスクの編集では空欄に戻せる。"""
+    response = client.post("/tasks", data={
+        "title": "開始日を設定", "due_date": "2026-11-10", "start_date": "2026-11-03",
+    })
+    assert response.status_code == 200
+    board_html = client.get("/").text
+    assert board_html.count('name="start_date"') >= 2
+    assert board_html.index('name="due_date"') < board_html.index('name="start_date"')
+    connection = database.connect(db_path)
+    try:
+        task = connection.execute(
+            "SELECT id, start_date FROM tasks WHERE user_id = ? AND title = ?", (1, "開始日を設定"),
+        ).fetchone()
+        assert task["start_date"] == "2026-11-03"
+
+        response = client.post(f"/tasks/{task['id']}/edit", data={
+            "title": "開始日を編集", "due_date": "2026-11-10", "start_date": "2026-11-04",
+        })
+        assert response.status_code == 200
+        edited = connection.execute(
+            "SELECT start_date FROM tasks WHERE user_id = ? AND id = ?", (1, task["id"]),
+        ).fetchone()
+        assert edited["start_date"] == "2026-11-04"
+
+        client.post(f"/tasks/{task['id']}/edit", data={
+            "title": "開始日を編集", "due_date": "2026-11-10", "start_date": "",
+        })
+        cleared = connection.execute(
+            "SELECT start_date FROM tasks WHERE user_id = ? AND id = ?", (1, task["id"]),
+        ).fetchone()
+        assert cleared["start_date"] is None
+
+        client.post("/tasks", data={
+            "title": "開始日なし", "due_date": "2026-11-10", "start_date": "",
+        })
+        blank = connection.execute(
+            "SELECT start_date FROM tasks WHERE user_id = ? AND title = ?", (1, "開始日なし"),
+        ).fetchone()
+        assert blank["start_date"] == "2026-10-29"
+
+        client.post("/tasks", data={
+            "title": "期限が過去で開始日なし", "due_date": "2026-10-28", "start_date": "",
+        })
+        past_deadline = connection.execute(
+            "SELECT start_date FROM tasks WHERE user_id = ? AND title = ?", (1, "期限が過去で開始日なし"),
+        ).fetchone()
+        assert past_deadline["start_date"] == "2026-10-28"
+    finally:
+        connection.close()
+
+
+def test_start_date_after_due_date_is_rejected_without_saving(client: TestClient, db_path: Path) -> None:
+    connection = database.connect(db_path)
+    try:
+        task_id = tasks.create_task(connection, 1, "変更前", due_date="2026-11-05")
+        connection.commit()
+    finally:
+        connection.close()
+
+    response = client.post(f"/tasks/{task_id}/edit", data={
+        "title": "保存してはいけない", "due_date": "2026-11-05", "start_date": "2026-11-06",
+    })
+
+    assert response.status_code == 200
+    assert "開始日は期限以前の日付にしてください" in response.text
+    assert 'value="2026-11-06"' in response.text
+    connection = database.connect(db_path)
+    try:
+        task = connection.execute(
+            "SELECT title, due_date, start_date FROM tasks WHERE user_id = ? AND id = ?", (1, task_id),
+        ).fetchone()
+        assert tuple(task) == ("変更前", "2026-11-05", None)
     finally:
         connection.close()
 

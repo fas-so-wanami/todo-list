@@ -170,6 +170,52 @@ def test_recurring_family_preserves_relative_deadlines(
     assert db.execute("SELECT COUNT(*) FROM tasks WHERE user_id = ?", (1,)).fetchone()[0] == 4
 
 
+def test_recurring_family_shifts_start_dates_with_deadlines(db: sqlite3.Connection) -> None:
+    parent = tasks.create_task(
+        db, 1, "開始日つき親", recurrence_rule="weekly",
+        due_date="2026-10-30", start_date="2026-10-28",
+    )
+    child = tasks.create_task(
+        db, 1, "開始日つき子", parent_id=parent,
+        due_date="2026-11-01", start_date="2026-10-30",
+    )
+    child_without_start_date = tasks.create_task(
+        db, 1, "開始日なしの子", parent_id=parent, due_date="2026-11-02",
+    )
+    tasks.set_status(db, child, "done")
+    tasks.set_status(db, child_without_start_date, "done")
+
+    tasks.set_status(db, parent, "done")
+
+    next_parent_id = db.execute(
+        "SELECT next_task_id FROM task_recurrences WHERE task_id = ?", (parent,),
+    ).fetchone()["next_task_id"]
+    next_parent = owned_row(db, next_parent_id)
+    next_children = db.execute(
+        "SELECT * FROM tasks WHERE user_id = ? AND parent_id = ? ORDER BY id", (1, next_parent_id),
+    ).fetchall()
+    assert next_parent["due_date"] == "2026-11-06"
+    assert next_parent["start_date"] == "2026-11-04"
+    assert next_children[0]["due_date"] == "2026-11-08"
+    assert next_children[0]["start_date"] == "2026-11-06"
+    assert next_children[1]["start_date"] is None
+
+
+def test_recurring_parent_without_deadline_anchors_future_start_date(db: sqlite3.Connection) -> None:
+    parent = tasks.create_task(
+        db, 1, "期限なしの繰り返し", recurrence_rule="weekly", start_date="2026-11-05",
+    )
+
+    tasks.set_status(db, parent, "done")
+
+    next_parent_id = db.execute(
+        "SELECT next_task_id FROM task_recurrences WHERE task_id = ?", (parent,),
+    ).fetchone()["next_task_id"]
+    next_parent = owned_row(db, next_parent_id)
+    assert next_parent["due_date"] == "2026-11-12"
+    assert next_parent["start_date"] == "2026-11-12"
+
+
 def seed_linkable_tasks(db_path: Path, recurrence: str | None = None) -> tuple[int, int]:
     """一覧から編集して結び付けるための、別々のタスクを作る。"""
     connection = database.connect(db_path)
@@ -232,6 +278,7 @@ def test_quick_add_can_create_child_in_parent_section(
         assert child is not None
         assert owned_row(connection, child["id"])["parent_id"] == parent
         assert owned_row(connection, child["id"])["due_date"] is None
+        assert owned_row(connection, child["id"])["start_date"] is None
         board = daily.build_board(connection, 1, set())
         assert any(task["id"] == child["id"] for task in board[expected_section])
     finally:

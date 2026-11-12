@@ -127,7 +127,7 @@
       function clearCompletionFeedback() {
         document.querySelectorAll(".just-completed").forEach(function (row) { row.classList.remove("just-completed"); });
       }
-      let reportToggleScroll = null;
+      let preservedScrollPosition = null;
       function applyCompletionEffects(enabled) {
         // 設定をONに戻しただけで、前に完了した行の演出を再生しない。
         clearCompletionFeedback();
@@ -166,9 +166,9 @@
         if (event.detail.target.id === "main-content") clearCompletionFeedback();
       });
       document.body.addEventListener("htmx:afterSettle", function () {
-        if (reportToggleScroll) {
-          const scrollPosition = reportToggleScroll;
-          reportToggleScroll = null;
+        if (preservedScrollPosition) {
+          const scrollPosition = preservedScrollPosition;
+          preservedScrollPosition = null;
           requestAnimationFrame(function () {
             window.scrollTo(scrollPosition.x, scrollPosition.y);
           });
@@ -219,9 +219,9 @@
       document.body.addEventListener("htmx:beforeRequest", function (event) { lastRequestSource = event.detail.elt; });
       document.body.addEventListener("htmx:beforeSwap", function (event) {
         if (event.detail.target.id !== "main-content") return;
-        reportToggleScroll = lastRequestSource && lastRequestSource.matches(".report-toggle")
-          ? { x: window.scrollX, y: window.scrollY }
-          : null;
+        preservedScrollPosition = lastRequestSource && lastRequestSource.matches(".quick-add-form")
+          ? null
+          : { x: window.scrollX, y: window.scrollY };
         const sentFrom = lastRequestSource;
         openPanels = Array.from(document.querySelectorAll("#main-content details.task-detail[open], #main-content details.row-note[open]"))
           .filter(function (panel) { return !(sentFrom && panel.contains(sentFrom)); })

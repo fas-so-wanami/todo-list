@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'doing', 'done')),
     progress INTEGER NOT NULL DEFAULT 0 CHECK (progress IN (0, 25, 50, 75, 100)),
     due_date TEXT,
+    start_date TEXT,
     memo TEXT NOT NULL DEFAULT '',
     started_at TEXT,
     completed_at TEXT,
@@ -170,6 +171,13 @@ def _add_waiting_column_if_missing(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE tasks ADD COLUMN waiting_note TEXT NOT NULL DEFAULT ''")
 
 
+def _add_start_date_column_if_missing(connection: sqlite3.Connection) -> None:
+    """開始日の列が無い既存DBに、値を埋めずに列だけ追加する。"""
+    column_names = {row["name"] for row in connection.execute("PRAGMA table_info(tasks)")}
+    if "start_date" not in column_names:
+        connection.execute("ALTER TABLE tasks ADD COLUMN start_date TEXT")
+
+
 def _add_report_toggle_columns_if_missing(connection: sqlite3.Connection) -> None:
     """日報の「作業時間」「勤務形態・休暇」の入力ON/OFFの列が無い既存DBに列を追加する(初期値はON)。"""
     column_names = {row["name"] for row in connection.execute("PRAGMA table_info(daily_reports)")}
@@ -193,6 +201,7 @@ def init_db(db_path: Path | str) -> None:
         connection.executescript(SCHEMA)
         _add_progress_column_if_missing(connection)
         _add_waiting_column_if_missing(connection)
+        _add_start_date_column_if_missing(connection)
         _add_report_toggle_columns_if_missing(connection)
         connection.execute(
             "INSERT OR IGNORE INTO users (id, name) VALUES (?, ?)",

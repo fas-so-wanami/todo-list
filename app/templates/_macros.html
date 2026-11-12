@@ -71,7 +71,7 @@
   <div class="state-main">
     <span class="task-status-label" data-task-status="{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
     {% if task.status == 'todo' %}
-    <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/doing?{{ view_query }}">開始する</button>
+    <button type="button" class="task-state-action start-task" hx-post="{{ base_url }}/status/doing?{{ view_query }}">作業を始める</button>
     {% elif task.status == 'doing' %}
     <button type="button" class="task-state-action" hx-post="{{ base_url }}/status/todo?{{ view_query }}">未着手に戻す</button>
     {% else %}
@@ -246,6 +246,7 @@
         {{ level_buttons("importance", "重要度", edit_values.importance) }}
         {{ level_buttons("urgency", "緊急性", edit_values.urgency) }}
         <label>期限 <input type="date" name="due_date" value="{{ edit_values.due_date or '' }}"></label>
+        <label>開始日 <input type="date" name="start_date" value="{{ edit_values.start_date or '' }}"></label>
         <label>タグ(案件) <input name="tag_text" value="{{ edit_values.tag_text }}" placeholder="案件A 案件B"></label>
         {% if not task.parent_id %}
         <label>繰り返し
@@ -318,7 +319,7 @@
       <span class="add-more-plus" aria-hidden="true"></span>
       <span class="add-more-label">詳しく書く</span>
       <span class="add-more-items" aria-hidden="true">
-        <span>期限</span><span>重要度</span><span>緊急性</span><span>メモ</span><span>追加先</span><span>親タスク</span>
+        <span>期限</span><span>開始日</span><span>重要度</span><span>緊急性</span><span>メモ</span><span>追加先</span><span>親タスク</span>
       </span>
       <span class="add-more-state" aria-hidden="true"></span>
     </summary>
@@ -341,6 +342,7 @@
       {{ level_buttons("importance", "重要度", 2) }}
       {{ level_buttons("urgency", "緊急性", 2) }}
       <label class="field-label">期限 <input type="date" name="due_date"></label>
+      <label class="field-label">開始日 <input type="date" name="start_date"></label>
       <label class="field-label wide">メモ <textarea name="memo" rows="3" placeholder="背景、手順、確認先など(Ctrl+Enterで追加)"></textarea></label>
     </div>
   </details>

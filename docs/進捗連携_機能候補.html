@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ToDo・WBS・日報 連携のたたき台</title>
+  <style>
+    :root { color-scheme: light; --ink: #1c2d31; --muted: #526565; --line: #cbd6d3; --paper: #f5f8f6; --white: #fff; --teal: #12645c; --teal-light: #ddf0eb; --blue: #365e9a; --yellow: #dfab3d; --red: #b94d48; --dark: #173d3a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Yu Gothic", "Meiryo", sans-serif; line-height: 1.75; }
+    .wrap { width: min(1120px, calc(100% - 48px)); margin: auto; }
+    header { background: var(--dark); color: var(--white); border-bottom: 6px solid var(--yellow); }
+    .topline { display: flex; justify-content: space-between; gap: 16px; padding-top: 24px; color: #c9e6de; font-size: 13px; font-weight: bold; }
+    .hero { display: grid; grid-template-columns: 1.2fr 0.8fr; align-items: end; gap: 48px; padding: 46px 0 52px; }
+    h1 { margin: 0 0 14px; font-size: 38px; line-height: 1.35; }
+    .lead { max-width: 650px; margin: 0; color: #dcebe6; font-size: 16px; }
+    .hero-note { border-left: 2px solid #6bb6a5; padding-left: 20px; font-size: 14px; color: #dcebe6; }
+    .hero-note strong { display: block; color: white; font-size: 17px; }
+    nav { background: #e4efeb; border-bottom: 1px solid var(--line); }
+    nav .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; padding-top: 12px; padding-bottom: 12px; }
+    a { color: var(--teal); }
+    nav a { font-size: 13px; font-weight: bold; text-decoration: none; }
+    main section { padding: 58px 0; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: var(--teal); font-weight: bold; font-size: 12px; }
+    h2 { font-size: 27px; line-height: 1.4; margin: 4px 0 12px; }
+    h3 { font-size: 19px; line-height: 1.45; margin: 0 0 10px; }
+    p { margin: 0 0 12px; }
+    .sub { color: var(--muted); max-width: 790px; }
+    .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 30px; border-top: 2px solid var(--teal); border-bottom: 1px solid var(--line); }
+    .flow-step { padding: 20px 24px 18px 0; position: relative; }
+    .flow-step + .flow-step { border-left: 1px solid var(--line); padding-left: 26px; }
+    .step-num { font-size: 12px; font-weight: bold; color: var(--teal); }
+    .flow-step strong { display: block; font-size: 19px; }
+    .flow-step p { color: var(--muted); font-size: 14px; margin: 5px 0 0; }
+    .note { margin-top: 22px; padding: 14px 18px; background: #e6eeeb; border-left: 4px solid var(--teal); font-size: 14px; }
+    .choices { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .choice { background: var(--white); border: 1px solid var(--line); border-top: 5px solid var(--teal); padding: 22px; }
+    .choice:nth-child(2) { border-top-color: var(--blue); }
+    .choice:nth-child(3) { border-top-color: var(--yellow); }
+    .choice-id { color: var(--teal); font-size: 12px; font-weight: bold; }
+    .choice p { font-size: 14px; color: var(--muted); }
+    .choice .scope { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 13px; }
+    .tag { display: inline-block; padding: 2px 8px; background: var(--teal-light); color: var(--teal); font-size: 12px; font-weight: bold; }
+    .band { background: white; }
+    .example-label { display: inline-block; margin: 14px 0 10px; color: var(--muted); font-size: 12px; font-weight: bold; }
+    .sheet { border: 1px solid var(--line); background: white; }
+    .sheet-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 14px 18px; background: #e8f1ee; border-bottom: 1px solid var(--line); }
+    .sheet-head span { color: var(--muted); font-size: 13px; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14px; text-align: left; }
+    th, td { padding: 12px 16px; border-bottom: 1px solid #e3ebe8; vertical-align: top; }
+    th { background: #f4f8f6; color: var(--muted); font-size: 12px; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .child { padding-left: 36px; }
+    .parent { font-weight: bold; }
+    .chip { display: inline-block; padding: 1px 8px; background: #e4edf7; color: #315580; font-size: 12px; font-weight: bold; white-space: nowrap; }
+    .chip.warning { background: #fff0cc; color: #76550e; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 24px; }
+    .detail { border-top: 2px solid var(--teal); padding-top: 14px; }
+    .detail p, .detail li { font-size: 14px; color: var(--muted); }
+    ul { padding-left: 20px; margin: 0; }
+    li + li { margin-top: 7px; }
+    .signals { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+    .signal { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: bold; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--blue); }
+    .dot.yellow { background: var(--yellow); } .dot.red { background: var(--red); }
+    .future { background: #edf2f0; }
+    .roadmap { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 26px; border-top: 1px solid #9fb6ae; }
+    .roadmap div { padding: 18px 20px 0 0; }
+    .roadmap strong { display: block; color: var(--teal); }
+    .roadmap p { font-size: 14px; color: var(--muted); }
+    .decision { background: var(--dark); color: white; padding: 40px; margin-top: 24px; }
+    .decision h3 { font-size: 23px; }
+    .decision p { color: #dcebe6; }
+    .status { display: inline-block; padding: 2px 9px; background: #dcece7; color: #174e46; font-size: 12px; font-weight: bold; }
+    .status.pending { background: #fff0cc; color: #76550e; }
+    .gantt { min-width: 760px; }
+    .gantt-grid { display: grid; grid-template-columns: minmax(210px, 1.7fr) 90px repeat(4, minmax(80px, 1fr)); align-items: stretch; }
+    .gantt-grid > div { padding: 10px 12px; border-right: 1px solid #e3ebe8; border-bottom: 1px solid #e3ebe8; font-size: 13px; }
+    .gantt-grid .gantt-heading { background: #f4f8f6; color: var(--muted); font-weight: bold; }
+    .gantt-grid .gantt-task { font-weight: bold; }
+    .gantt-grid .gantt-child { padding-left: 26px; font-weight: normal; }
+    .gantt-grid .slot { position: relative; min-height: 48px; padding: 0; }
+    .bar { position: absolute; top: 16px; height: 15px; left: 3px; right: 3px; background: #4a8d7e; }
+    .bar.start { border-radius: 3px 0 0 3px; right: 0; }
+    .bar.middle { left: 0; right: 0; }
+    .bar.end { border-radius: 0 3px 3px 0; left: 0; }
+    .bar.single { border-radius: 3px; }
+    .bar.waiting { background: #c49536; }
+    .bar.done { background: #7a9290; }
+    .work-list { counter-reset: work; list-style: none; padding: 0; margin: 24px 0 0; }
+    .work-list li { position: relative; padding: 17px 0 17px 48px; border-top: 1px solid var(--line); }
+    .work-list li + li { margin-top: 0; }
+    .work-list li::before { counter-increment: work; content: counter(work, decimal-leading-zero); position: absolute; left: 0; top: 19px; color: var(--teal); font-weight: bold; font-size: 13px; }
+    .work-list strong { display: block; font-size: 16px; }
+    .work-list p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .small { color: var(--muted); font-size: 13px; }
+    footer { padding: 26px 0 38px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      .wrap { width: min(100% - 32px, 1120px); }
+      .hero, .choices, .two-col, .roadmap { grid-template-columns: 1fr; }
+      .hero { gap: 24px; padding: 32px 0; }
+      h1 { font-size: 29px; }
+      .flow { grid-template-columns: 1fr; }
+      .flow-step + .flow-step { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; }
+      .decision { padding: 24px; }
+      main section { padding: 40px 0; }
+    }
+    @media print { header, .decision { print-color-adjust: exact; -webkit-print-color-adjust: exact; } nav { display: none; } main section { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="topline"><span>TODO × WBS × 日報 / 検討資料</span><span>未実装・たたき台</span></div>
+      <div class="hero">
+        <div><h1>ToDo・WBS・日報<br>連携のたたき台</h1><p class="lead">タスクを一度登録し、チームの予定確認から個人の日報提出までつなぐ。これまでの相談内容と、次に進めるための作業をまとめました。</p></div>
+        <div class="hero-note"><strong>毎日の入力は、軽いまま。</strong>既存のToDoを中心に、案件の予定と進捗を共有。新しい作業の入力や、複雑な設定をできるだけ増やしません。</div>
+      </div>
+    </div>
+  </header>
+  <nav aria-label="ページ内の移動"><div class="wrap"><a href="#vision">全体像</a><a href="#tasks">タスク</a><a href="#weekly">WBS・ガント</a><a href="#privacy">共有範囲</a><a href="#dates">日付</a><a href="#daily">日報</a><a href="#work">作業の順番</a><a href="#open">未決定</a></div></nav>
+  <main>
+    <section id="vision"><div class="wrap">
+      <div class="eyebrow">01 / 全体像</div><h2>記録は一度。見る相手に合わせてつなぐ。</h2>
+      <p class="sub">参考のWBSやRedmineの考え方を取り入れつつ、ToDo側で案件・作業・予定を管理します。資料のExcelや参考アプリとの自動連携は、今回の前提にしていません。</p>
+      <div class="flow" aria-label="登録から日報までの流れ">
+        <div class="flow-step"><span class="step-num">01 / 管理者・担当者</span><strong>タスクを登録</strong><p>管理者が案件の大枠を作り、担当者も必要な作業を追加。</p></div>
+        <div class="flow-step"><span class="step-num">02 / チーム</span><strong>予定と進捗を見る</strong><p>同じ案件の共有タスクを、担当者をまたいで確認。</p></div>
+        <div class="flow-step"><span class="step-num">03 / 担当者・上司</span><strong>日報を提出</strong><p>日々の操作から候補を作り、提出後に上司が確認。</p></div>
+      </div>
+      <div class="note"><strong>現在地：</strong>親子タスク・状態・日報は既存機能。チーム共有、案件管理、WBS画面、上司への日報表示は未実装です。この資料は今後の検討用で、実装開始の指示ではありません。</div>
+    </div></section>
+
+    <section id="tasks" class="band"><div class="wrap">
+      <div class="eyebrow">02 / タスク</div><h2>案件 → 親 → 子。それ以上は増やさない。</h2>
+      <p class="sub">案件の中に親タスクを置き、その下に分担する子タスクを並べます。子の下には孫タスクを作りません。</p>
+      <span class="example-label">構成イメージ / 架空のデータ</span>
+      <div class="sheet"><div class="sheet-head"><strong>案件：システム移行</strong><span>親子は１段</span></div><div class="table-scroll"><table><thead><tr><th>タスク</th><th>担当者</th><th>状態</th></tr></thead><tbody>
+        <tr><td class="parent">受入テスト準備</td><td>—</td><td>共有の子 1 / 3 件完了</td></tr>
+        <tr><td class="child">└ テスト項目を確認</td><td>Aさん</td><td>完了</td></tr>
+        <tr><td class="child">└ テストデータを準備</td><td>Bさん</td><td>進行中</td></tr>
+        <tr><td class="child">└ テスト日程を調整</td><td>Aさん</td><td>未着手</td></tr>
+      </tbody></table></div></div>
+      <div class="two-col"><div class="detail"><h3>登録は手軽に</h3><p>名前だけで追加でき、必要なら担当者・開始予定日・期限なども入力。子タスクの担当者は１人で、追加した人を初期値にする案です。</p></div><div class="detail"><h3>作業が増えたら</h3><p>付随する作業は別の子タスクとして追加。共有の子がすべて完了しても親は自動完了せず、人が「親も完了にする」を選びます。</p></div></div>
+    </div></section>
+
+    <section id="weekly"><div class="wrap">
+      <div class="eyebrow">03 / WBS・ガント</div><h2>チームの予定を、一覧と横棒で見る</h2>
+      <p class="sub">同じ案件の共有タスクを担当者横断で表示。最初は週単位、必要な人は日単位へ切り替える案です。ガントは見る専用で、日程変更は編集欄で行います。</p>
+      <span class="example-label">画面イメージ / 架空のデータ / 横棒は週単位の概略</span>
+      <div class="sheet"><div class="sheet-head"><strong>システム移行　/　WBS</strong><span>週表示（初期） ・ 日表示に切替</span></div><div class="table-scroll"><div class="gantt" role="img" aria-label="受入テスト準備の子タスク３件と、11月の週ごとの予定を示す架空のガント図。テスト項目を確認は11月2日の週、テストデータを準備は11月9日の週、テスト日程を調整は11月9日と16日の週に予定。">
+        <div class="gantt-grid">
+          <div class="gantt-heading">タスク</div><div class="gantt-heading">担当</div><div class="gantt-heading">11/2 週</div><div class="gantt-heading">11/9 週</div><div class="gantt-heading">11/16 週</div><div class="gantt-heading">11/23 週</div>
+          <div class="gantt-task">受入テスト準備<br><span class="small">共有の子 1 / 3 件完了</span></div><div>—</div><div class="slot"><span class="bar start"></span></div><div class="slot"><span class="bar middle"></span></div><div class="slot"><span class="bar end"></span></div><div class="slot"></div>
+          <div class="gantt-child">└ テスト項目を確認</div><div>Aさん</div><div class="slot"><span class="bar single done"></span></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+          <div class="gantt-child">└ テストデータを準備</div><div>Bさん</div><div class="slot"></div><div class="slot"><span class="bar single"></span></div><div class="slot"></div><div class="slot"></div>
+          <div class="gantt-child">└ テスト日程を調整</div><div>Aさん</div><div class="slot"></div><div class="slot"><span class="bar start waiting"></span></div><div class="slot"><span class="bar end waiting"></span></div><div class="slot"></div>
+        </div></div></div></div>
+      <div class="two-col"><div class="detail"><h3>信号と文字で状態を表示</h3><ul><li>青：以下の遅れがない。</li><li>黄：開始予定日を過ぎても未着手。</li><li>赤：期限を過ぎても未完了。</li><li>必要な日付が未設定なら判定なし。完了は別表示。</li></ul><div class="signals"><span class="signal"><span class="dot"></span>青</span><span class="signal"><span class="dot yellow"></span>黄</span><span class="signal"><span class="dot red"></span>赤</span></div></div><div class="detail"><h3>複雑にしないために</h3><ul><li>期限前の細かな進み具合は信号で判定しない。</li><li>色だけに頼らず、状態を文字でも示す。</li><li>見た目が複雑なら、一覧表だけにする選択肢を残す。</li><li>親の信号や予定・実績の件数の詳しい計算は未決定。</li></ul></div></div>
+      <div class="note">期限を自動で当日に設定したタスクは、翌日も未完了なら期限超過になります。入力を簡単にできる一方、実際の予定と合わない場合は日付の見直しが必要です。</div>
+    </div></section>
+
+    <section id="privacy" class="band"><div class="wrap">
+      <div class="eyebrow">04 / 共有と権限</div><h2>見せる範囲は、２つだけ</h2>
+      <div class="two-col"><div class="detail"><h3>共有</h3><p>チームと上司に見える。案件タスクは共有を初期値にし、担当者と管理者が更新する方向です。</p></div><div class="detail"><h3>自分だけ</h3><p>本人以外には見せない。チームの一覧・ガント・進捗件数に含めず、共有の親の完了条件にも含めません。</p></div></div>
+      <div class="note"><strong>共有の親と非共有の子：</strong>共有の子がすべて完了すれば親を完了できます。非共有の子は未完了でも本人の作業として残し、親の完了や収納によって見失わないようにします。</div>
+      <p class="small">日報の「その他」には非共有タスクの記録時間を合算するため、上司には非共有の作業があることが分かります。タスク名・件数は表示しません。</p>
+    </div></section>
+
+    <section id="dates"><div class="wrap">
+      <div class="eyebrow">05 / 日付の扱い</div><h2>空欄でも追加でき、矛盾は残さない</h2>
+      <div class="table-scroll"><table><thead><tr><th>項目・場面</th><th>たたき台のルール</th></tr></thead><tbody>
+        <tr><td>開始予定日が空欄</td><td>登録日を自動設定。指定した期限が過去なら、期限日に合わせる。</td></tr>
+        <tr><td>期限が空欄</td><td>原則、登録日を自動設定。開始予定日が未来なら、その開始予定日に合わせる。</td></tr>
+        <tr><td>両方を手入力して矛盾</td><td>勝手に変更せず、開始予定日が期限以前になるよう確認を出す。</td></tr>
+        <tr><td>実際の開始日</td><td>「開始する」を押した日を記録。押す前は未設定。</td></tr>
+      </tbody></table></div>
+      <div class="note">開始予定日は予定、実際の開始日は実績です。上の自動設定は新しい運用案であり、現在は子タスクの開始日・期限を空欄のまま追加できます。既存の空欄データをどう扱うかは実装前に確認します。</div>
+    </div></section>
+
+    <section id="daily" class="band"><div class="wrap">
+      <div class="eyebrow">06 / 日報</div><h2>候補は自動、提出は本人が決める</h2>
+      <p class="sub">着手・完了などを更新したタスクをその日の日報候補に入れ、必要なら追加・削除できる案です。更新せずに作業したタスクは、自分で追加する必要があります。</p>
+      <div class="flow"><div class="flow-step"><span class="step-num">01 / 担当者</span><strong>候補を確認</strong><p>自動で入った候補を調整し、必要な作業時間を入力。</p></div><div class="flow-step"><span class="step-num">02 / 担当者</span><strong>日報を提出</strong><p>提出前の下書きは本人だけが見られる。</p></div><div class="flow-step"><span class="step-num">03 / 上司</span><strong>提出分を確認</strong><p>本人と上司だけが提出済み日報を見られる。</p></div></div>
+      <span class="example-label">上司に見える日報 / 架空のデータ</span>
+      <div class="sheet"><div class="sheet-head"><strong>Aさんの日報</strong><span>提出済み</span></div><div class="table-scroll"><table><thead><tr><th>作業</th><th>記録した時間</th></tr></thead><tbody><tr><td>受入テスト準備 › テスト項目を確認</td><td>2:00</td></tr><tr><td>その他（非共有タスクの合算）</td><td>0:30</td></tr><tr><td class="parent">合計</td><td class="parent">2:30</td></tr></tbody></table></div></div>
+      <div class="two-col"><div class="detail"><h3>提出後の修正</h3><p>修正中は上司に前回提出分を表示。再提出したら新しい内容に切り替えます。修正中の下書きは見せません。</p></div><div class="detail"><h3>公開範囲の変更</h3><p>提出後に共有から「自分だけ」に変更したら、過去の日報でもすぐ名前を隠し、提出済みの時間を「その他」にまとめ直します。</p></div></div>
+      <p class="small">「その他」の内訳や件数は表示しません。集計の対象は日報に記録された時間であり、入力されていない時間を自動推測するものではありません。</p>
+    </div></section>
+
+    <section id="work" class="future"><div class="wrap">
+      <div class="eyebrow">07 / 次に作る人へ</div><h2>実装するなら、この順番で小さく進める</h2>
+      <p class="sub">これは作業候補です。実装前に未決定事項と既存方針の変更を確認し、段階ごとに動作を確かめます。アプリ本体はまだ変更していません。</p>
+      <ol class="work-list">
+        <li><strong>方針と既存データの扱いを決める</strong><p><a href="設計方針.md">設計方針</a>と<a href="次の作業.md">次の作業</a>を確認。今の「本人のみ編集」「上司が全タスクを閲覧」「工数集計・レポート出力は後回し」と、今回の案の違いを整理し、合意後に方針を更新する。実データを消さず、既存の期限・開始日が空欄のタスクの移行方法を決める。</p></li>
+        <li><strong>共有・ログイン・権限の土台を作る</strong><p>１人固定から本人を識別する形へ。案件・担当者・管理者・共有範囲を扱い、画面だけでなくサーバー側でも他人の非共有データを拒否する。共有先・管理者の決め方は先に確認。</p></li>
+        <li><strong>タスクと親子の扱いをつなぐ</strong><p>案件の親子・担当者・公開範囲を登録。追加時の日付補完、日付の矛盾、本人だけの子が共有親の完了や他人の件数に影響しないことを確認する。既存の完了・繰り返し・アーカイブを壊さない。</p></li>
+        <li><strong>WBSとガントを表示する</strong><p>共有タスクの一覧・文字付き信号・閲覧専用ガントを作る。週を初期表示にし、日に切り替えられるようにする。見た目を試し、複雑なら一覧だけに見直す。</p></li>
+        <li><strong>日報候補と提出後の表示を作る</strong><p>対象操作から日報候補を追加し、手動で調整できるようにする。提出済みの内容を保持して下書きと分ける。上司には非共有の名前・件数を出さず、記録時間は「その他」に合算する。</p></li>
+        <li><strong>確認してから共有する</strong><p>各段階で自動テストと画面確認を行い、本人・別の担当者・上司で見える範囲を比較する。実データを使わない検証環境で、データ移行・提出後の修正・公開範囲変更も試す。共有環境への公開は別途確認する。</p></li>
+      </ol>
+      <div class="note"><strong>調べる場所：</strong><a href="../app/tasks.py">タスク・親子</a>、<a href="../app/db.py">データの保存</a>、<a href="../app/reports.py">日報</a>、<a href="../app/main.py">画面と権限</a>、<a href="../tests/">既存テスト</a>。実装位置は着手時に実コードを確認して決めます。</div>
+      <div class="two-col"><div class="detail"><h3>必ず確かめること</h3><ul><li>他人が非共有タスクの内容・件数を画面や直接のアクセスで取得できない。</li><li>非共有の子が共有親の集計・完了を妨げず、本人には未完了として残る。</li><li>上司に提出前・再提出前の下書きが見えない。</li><li>公開範囲を変更すると、過去の提出分も非共有の名前を隠す。</li></ul></div><div class="detail"><h3>既存の使い心地も守る</h3><ul><li>名前だけの追加と、詳しい項目を入れる追加の両方が使える。</li><li>未入力の日付を自動設定し、入力済みの日付を勝手に直さない。</li><li>自動候補を追加・削除でき、既存の日報入力が消えない。</li><li>週・日の切替と、日付・状態を文字でも確認できる。</li></ul></div></div>
+    </div></section>
+
+    <section id="open"><div class="wrap"><div class="eyebrow">08 / 未決定</div><h2>実装前に、まだ確認が必要なこと</h2><p class="sub">決めていないことを勝手に仕様にしないためのメモです。上から順に、必要な時点で相談します。</p>
+      <div class="table-scroll"><table><thead><tr><th>確認すること</th><th>なぜ必要か</th></tr></thead><tbody>
+        <tr><td>チームの共有環境とログイン方法</td><td>現在は個人PC内で動くため。既存案のAzureを含め、利用環境・権限・費用を確認。</td></tr>
+        <tr><td>管理者と案件の参加者の決め方</td><td>誰が案件を作成し、誰が共有タスクや他人の予定を変更できるかを確定するため。</td></tr>
+        <tr><td>他人が担当するタスクの非共有化</td><td>「自分だけ」の所有者と担当者が食い違わないようにするため。</td></tr>
+        <tr><td>親の信号・予定と実績の集計条件</td><td>非共有の子を除くことに加え、日付未設定・共有の子が０件・過去時点・完了後の扱いを決めるため。</td></tr>
+        <tr><td>日報候補に入れる操作の範囲</td><td>着手・完了以外に、どの更新を候補化するか。取り消しや候補から外した後の扱いも決めるため。</td></tr>
+        <tr><td>過去の日報と公開範囲を戻した場合</td><td>非共有から再び共有へ変えたとき、過去の提出分を再表示するかを決めるため。</td></tr>
+        <tr><td>既存の空欄・繰り返し・アーカイブ</td><td>新しい日付と公開範囲の初期値を、保存済みデータにどう適用するかを決めるため。</td></tr>
+        <tr><td>提出済み日報の表示内容</td><td>親の進捗や日報の備考をどう表示・保存するか。備考に本人が記入した非共有の内容は自動で判別できないため。</td></tr>
+        <tr><td>ファイル出力や工数集計</td><td>現時点は画面での確認が優先。Excel出力・案件別工数集計・見積もりは採用未定。</td></tr>
+      </tbody></table></div>
+      <div class="decision"><h3>まずは、このたたき台を確認</h3><p>画面イメージと作業の順番に、認識違いや足りないところがないか確認します。実装は、未決定事項と既存方針の変更を相談してから、小さく進めます。</p></div>
+    </div></section>
+  </main>
+  <footer><div class="wrap">検討用のたたき台 / 図と数値は架空の例 / アプリ本体は未変更 / 最終更新：2026年11月12日</div></footer>
+</body>
+</html>

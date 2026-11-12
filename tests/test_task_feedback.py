@@ -37,6 +37,14 @@ def test_completion_preference_is_outside_replaced_content(client: TestClient, u
     assert "data-completion-effects-toggle" not in client.get("/content").text
 
 
+def test_main_content_swaps_preserve_scroll_except_quick_add(client: TestClient) -> None:
+    html = client.get("/").text
+    assert 'event.detail.target.id !== "main-content"' in html
+    assert 'lastRequestSource.matches(".quick-add-form")' in html
+    assert "{ x: window.scrollX, y: window.scrollY }" in html
+    assert "window.scrollTo(scrollPosition.x, scrollPosition.y)" in html
+
+
 @pytest.mark.parametrize("view", ["", "mini"])
 def test_only_new_successful_completion_gets_feedback(client: TestClient, db_path: Path, view: str) -> None:
     connection = database.connect(db_path)

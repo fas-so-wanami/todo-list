@@ -149,6 +149,34 @@ def test_existing_progress_is_preserved_as_state(
     assert daily.get_minutes(db, task_id, date(2026, 10, 28)) == 90
 
 
+def test_init_adds_nullable_start_date_to_existing_tasks(tmp_path: Path) -> None:
+    """開始日のない既存DBを移行しても、既存タスクの値を埋めない。"""
+    db_path = tmp_path / "legacy-todo.db"
+    connection = database.connect(db_path)
+    legacy_schema = database.SCHEMA.replace("    start_date TEXT,\n", "")
+    connection.executescript(legacy_schema)
+    connection.execute("INSERT INTO users (id, name) VALUES (?, ?)", (1, "自分"))
+    connection.execute(
+        "INSERT INTO tasks (user_id, title, created_at) VALUES (?, ?, ?)",
+        (1, "既存タスク", "2026-10-29T14:30:00"),
+    )
+    connection.commit()
+    connection.close()
+
+    database.init_db(db_path)
+
+    migrated = database.connect(db_path)
+    try:
+        columns = {row["name"]: row for row in migrated.execute("PRAGMA table_info(tasks)")}
+        assert columns["start_date"]["type"] == "TEXT"
+        assert columns["start_date"]["notnull"] == 0
+        assert migrated.execute(
+            "SELECT start_date FROM tasks WHERE user_id = ? AND title = ?", (1, "既存タスク"),
+        ).fetchone()["start_date"] is None
+    finally:
+        migrated.close()
+
+
 def test_startup_recalculates_parents_without_creating_recurrences(db: sqlite3.Connection, db_path: Path) -> None:
     parent, first, second = make_family(db)
     db.execute(

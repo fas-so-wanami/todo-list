@@ -14,7 +14,7 @@ LEVEL_LABELS = {1: "低", 2: "中", 3: "高"}
 RECURRENCE_LABELS = {"daily": "毎日", "weekdays": "平日", "weekly": "毎週", "monthly": "毎月"}
 LONG_RUNNING_MINUTES = 5 * 60  # 同一タスクの累計がこれ以上なら自動ハイライト
 
-EDITABLE_FIELDS = {"title", "importance", "urgency", "due_date", "memo", "recurrence_rule"}
+EDITABLE_FIELDS = {"title", "importance", "urgency", "due_date", "start_date", "memo", "recurrence_rule"}
 RESTORABLE_FIELDS = EDITABLE_FIELDS | {"status", "progress", "started_at", "completed_at", "waiting_since", "waiting_note"}
 MAX_NOTE_LENGTH = 200  # 相談の理由・待ちの一言の上限
 TAG_PATTERN = re.compile(r"#(\S+)")
@@ -46,6 +46,32 @@ def normalize_due_date(value: str | None) -> str | None:
         return date.fromisoformat(value).isoformat()
     except ValueError:
         return None
+
+
+class TaskDateError(ValueError):
+    """タスクの開始日と期限の入力を理由付きで断るためのエラー。"""
+
+
+def normalize_start_date(value: str | None) -> str | None:
+    """開始日を YYYY-MM-DD にそろえ、未入力は空のまま扱う。"""
+    if not value:
+        return None
+    try:
+        normalized = date.fromisoformat(value).isoformat()
+    except ValueError as error:
+        raise TaskDateError("開始日は YYYY-MM-DD の日付を入力してください。") from error
+    if value != normalized:
+        raise TaskDateError("開始日は YYYY-MM-DD の日付を入力してください。")
+    return normalized
+
+
+def validate_start_date(start_date: str | None, due_date: str | None) -> str | None:
+    """開始日を検証し、期限より後の日付を登録しない。"""
+    normalized_start_date = normalize_start_date(start_date)
+    normalized_due_date = normalize_due_date(due_date)
+    if normalized_start_date and normalized_due_date and normalized_start_date > normalized_due_date:
+        raise TaskDateError("開始日は期限以前の日付にしてください。")
+    return normalized_start_date
 
 
 def normalize_recurrence(value: str | None) -> str | None:
@@ -84,6 +110,7 @@ def create_task(
     importance: int = 2,
     urgency: int = 2,
     due_date: str | None = None,
+    start_date: str | None = None,
     memo: str = "",
     tag_names: list[str] | None = None,
     recurrence_rule: str | None = None,
@@ -95,12 +122,13 @@ def create_task(
         if recurrence_rule:
             raise TaskRelationshipError("子タスクの繰り返しは設定できません。親側で設定してください。")
     cursor = db.execute(
-        """INSERT INTO tasks (user_id, parent_id, title, importance, urgency, due_date,
+        """INSERT INTO tasks (user_id, parent_id, title, importance, urgency, due_date, start_date,
                               memo, recurrence_rule, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             user_id, parent_id, title.strip(), clamp_level(importance), clamp_level(urgency),
-            normalize_due_date(due_date), memo, normalize_recurrence(recurrence_rule),
+            normalize_due_date(due_date), validate_start_date(start_date, due_date),
+            memo, normalize_recurrence(recurrence_rule),
             clock.now_iso(),
         ),
     )
@@ -426,7 +454,7 @@ def next_due_date(rule: str, base_date: date) -> date:
 
 
 def create_next_occurrence(db: sqlite3.Connection, completed_task: sqlite3.Row) -> int | None:
-    """次回の親子セットを未着手で作る。子の期限は元の親との日数差を保つ。"""
+    """次回の親子セットを未着手で作り、開始日と期限の日数差を保つ。"""
     occurrence = db.execute(
         "SELECT r.next_task_id FROM task_recurrences r JOIN tasks t ON t.id = r.task_id "
         "WHERE t.user_id = ? AND r.task_id = ?",
@@ -442,14 +470,24 @@ def create_next_occurrence(db: sqlite3.Connection, completed_task: sqlite3.Row) 
     base_date = clock.today()
     if completed_task["due_date"]:
         base_date = max(date.fromisoformat(completed_task["due_date"]), base_date)
-    next_date = next_due_date(completed_task["recurrence_rule"], base_date)
     original_date = date.fromisoformat(completed_task["due_date"]) if completed_task["due_date"] else clock.today()
+    if not completed_task["due_date"] and completed_task["start_date"]:
+        scheduled_start_date = date.fromisoformat(completed_task["start_date"])
+        if scheduled_start_date > original_date:
+            # 期限のない親の開始日が未来なら、次回期限もその日以降を基準にする。
+            original_date = scheduled_start_date
+            base_date = scheduled_start_date
+    next_date = next_due_date(completed_task["recurrence_rule"], base_date)
     date_shift = next_date - original_date
     next_task_id = None
     for source in [completed_task, *children]:
         is_parent = source["id"] == completed_task["id"]
         due_date = next_date.isoformat() if is_parent else (
             (date.fromisoformat(source["due_date"]) + date_shift).isoformat() if source["due_date"] else None
+        )
+        start_date = (
+            (date.fromisoformat(source["start_date"]) + date_shift).isoformat()
+            if source["start_date"] else None
         )
         tag_names = [row["name"] for row in db.execute(
             "SELECT g.name FROM task_tags tt JOIN tags g ON g.id = tt.tag_id "
@@ -458,7 +496,7 @@ def create_next_occurrence(db: sqlite3.Connection, completed_task: sqlite3.Row) 
         created_id = create_task(
             db, source["user_id"], source["title"],
             parent_id=None if is_parent else next_task_id,
-            importance=source["importance"], urgency=source["urgency"], due_date=due_date,
+            importance=source["importance"], urgency=source["urgency"], due_date=due_date, start_date=start_date,
             memo=source["memo"], tag_names=tag_names,
             recurrence_rule=completed_task["recurrence_rule"] if is_parent else None,
         )
