@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import blockers, clock, daily, db as database, reports, tasks
+from app import auth, blockers, clock, daily, db as database, projects, reports, tasks, wbs
 from app.version import compute_app_version
 from app.ai import actions as ai_actions
 
@@ -91,9 +91,9 @@ def view_state(tag: str = "", view: str = "") -> dict:
 ViewState: TypeAlias = Annotated[dict, Depends(view_state)]
 
 
-def owned_task(task_id: int, db: Database) -> sqlite3.Row | None:
-    """操作の対象が固定利用者本人のタスクかを確かめ、他人のタスクを操作させない。"""
-    return tasks.get_owned_task(db, database.DEFAULT_USER_ID, task_id)
+def owned_task(task_id: int, request: Request, db: Database) -> sqlite3.Row | None:
+    """操作の対象がログイン中の本人のタスクかを確かめる。"""
+    return tasks.get_owned_task(db, request.state.user_id, task_id)
 
 
 OwnedTask: TypeAlias = Annotated[sqlite3.Row | None, Depends(owned_task)]
@@ -101,10 +101,20 @@ OwnedTask: TypeAlias = Annotated[sqlite3.Row | None, Depends(owned_task)]
 
 def create_app(db_path: Path | str | None = None) -> FastAPI:
     resolved_db_path = db_path or database.resolve_db_path()
+    auth_settings = auth.load_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         database.init_db(resolved_db_path)
+        identity_connection = database.connect(resolved_db_path)
+        try:
+            auth.initialize_users(identity_connection, resolved_db_path, auth_settings)
+            identity_connection.commit()
+        except Exception:
+            identity_connection.rollback()
+            raise
+        finally:
+            identity_connection.close()
         # 他プロセス(MCPサーバー)による更新を検知するための接続。PRAGMA data_version は
         # この接続以外からのコミットで値が変わる。
         app.state.version_connection = database.connect(resolved_db_path)
@@ -113,6 +123,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     app = FastAPI(title="ToDoリスト", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.db_path = resolved_db_path
+    app.state.auth_settings = auth_settings
     version_lock = threading.Lock()
     # DNSリバインディング対策: ローカルのホスト名以外へのアクセスは拒否する
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(LOCAL_HOSTNAMES))
@@ -135,8 +146,6 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     templates.env.globals["APP_VERSION"] = app_version  # CSS の URL に付けて古いキャッシュを使わせない
     templates.env.filters["hhmm"] = reports.format_hhmm
     templates.env.filters["month_day"] = format_month_day
-    user_id = database.DEFAULT_USER_ID
-
     @app.middleware("http")
     async def reject_cross_origin_writes(request: Request, call_next):
         # 他サイトのページからローカルAPIへ更新リクエストを送らせない(CSRF対策)。
@@ -148,6 +157,96 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
                 return JSONResponse({"detail": "許可されていないリクエスト元です"}, status_code=403)
         return await call_next(request)
 
+    @app.middleware("http")
+    async def identify_request_user(request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/static/") or path in ("/manifest.webmanifest", "/sw.js"):
+            return await call_next(request)
+        if auth_settings.mode == "local":
+            request.state.user_id = database.DEFAULT_USER_ID
+            request.state.user_name = database.DEFAULT_USER_NAME
+            request.state.user_email = None
+            request.state.is_manager = False
+        elif auth_settings.mode == "dev":
+            if path in ("/login", "/dev-login", "/logout", "/api/data-version"):
+                return await call_next(request)
+            selected_user_id = auth.verify_development_user(
+                request.cookies.get(auth.DEVELOPMENT_COOKIE_NAME), auth_settings.cookie_secret,
+            )
+            identity_connection = database.connect(resolved_db_path)
+            try:
+                development_users = auth.get_development_users(identity_connection, auth_settings)
+                current_user = next(
+                    (user for user in development_users if user["id"] == selected_user_id), None,
+                )
+            finally:
+                identity_connection.close()
+            if current_user is None:
+                return RedirectResponse("/login", status_code=303)
+            request.state.user_id = current_user["id"]
+            request.state.user_name = current_user["name"]
+            request.state.user_email = current_user["email"]
+            request.state.is_manager = current_user["email"] in auth_settings.manager_emails
+        else:
+            email = auth.normalize_email(request.headers.get("X-MS-CLIENT-PRINCIPAL-NAME"))
+            if not email:
+                return HTMLResponse("Microsoft 365でログインしてください。", status_code=401)
+            identity_connection = database.connect(resolved_db_path)
+            try:
+                current_user = auth.resolve_enterprise_user(identity_connection, email, auth_settings)
+                identity_connection.commit()
+            except Exception:
+                identity_connection.rollback()
+                raise
+            finally:
+                identity_connection.close()
+            if current_user is None:
+                return HTMLResponse("このアプリの利用が許可されていません。", status_code=403)
+            request.state.user_id = current_user["id"]
+            request.state.user_name = current_user["name"]
+            request.state.user_email = current_user["email"]
+            request.state.is_manager = email in auth_settings.manager_emails
+        return await call_next(request)
+
+    @app.get("/login", response_class=HTMLResponse)
+    def development_login_page(request: Request, db: Database):
+        if auth_settings.mode != "dev":
+            return RedirectResponse("/", status_code=303)
+        return templates.TemplateResponse(request, "dev_login.html", {
+            "request": request,
+            "users": auth.get_development_users(db, auth_settings),
+        })
+
+    @app.post("/dev-login")
+    def select_development_user(db: Database, user_id: str = Form(...)):
+        if auth_settings.mode != "dev":
+            return RedirectResponse("/login", status_code=303)
+        if not user_id.isascii() or not user_id.isdecimal():
+            response = RedirectResponse("/login", status_code=303)
+            response.delete_cookie(auth.DEVELOPMENT_COOKIE_NAME, path="/")
+            return response
+        selected_user_id = int(user_id)
+        valid_user_ids = {user["id"] for user in auth.get_development_users(db, auth_settings)}
+        if selected_user_id not in valid_user_ids:
+            response = RedirectResponse("/login", status_code=303)
+            response.delete_cookie(auth.DEVELOPMENT_COOKIE_NAME, path="/")
+            return response
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(
+            auth.DEVELOPMENT_COOKIE_NAME,
+            auth.sign_development_user(selected_user_id, auth_settings.cookie_secret),
+            httponly=True, samesite="lax", path="/", max_age=60 * 60 * 8,
+        )
+        return response
+
+    @app.post("/logout")
+    def development_logout():
+        if auth_settings.mode != "dev":
+            return RedirectResponse("/", status_code=303)
+        response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie(auth.DEVELOPMENT_COOKIE_NAME, path="/")
+        return response
+
     def build_view_query(state: dict) -> str:
         params = {}
         if state["tag"]:
@@ -157,12 +256,18 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return urlencode(params)
 
     def base_context(request: Request, view: str) -> dict:
-        return {"request": request, "view": view, "today_label": format_today(), "today_iso": clock.today().isoformat()}
+        return {
+            "request": request, "view": view, "today_label": format_today(),
+            "today_iso": clock.today().isoformat(),
+            "current_user_name": getattr(request.state, "user_name", database.DEFAULT_USER_NAME),
+            "development_login_enabled": auth_settings.mode == "dev",
+        }
 
     def board_context(
         request: Request, db: sqlite3.Connection, state: dict, notice: dict | None = None,
         highlight: dict | None = None,
     ) -> dict:
+        user_id = request.state.user_id
         report_task_ids = reports.report_task_ids(db, user_id, clock.today())
         return {
             **base_context(request, "board"),
@@ -178,6 +283,10 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             "edit_draft": (highlight or {}).get("edit_draft"),
             "board": daily.build_board(db, user_id, report_task_ids, state["tag"] or None),
             "parent_candidates": tasks.list_parent_candidates(db, user_id),
+            "project_options": projects.list_projects(db, user_id, include_closed=False),
+            "all_projects": projects.list_projects(db, user_id),
+            "refresh_project_options": (highlight or {}).get("refresh_project_options", False),
+            "project_management_open": (highlight or {}).get("project_management_open", False),
             "report_count": len(report_task_ids),
             "tag_names": tasks.list_tag_names(db, user_id),
             "selected_tag": state["tag"],
@@ -242,6 +351,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     @app.get("/archive", response_class=HTMLResponse)
     def archive_page(request: Request, db: Database, tag: str = ""):
+        user_id = request.state.user_id
         return templates.TemplateResponse(request, "archive.html", {
             **base_context(request, "archive"),
             "archive_groups": daily.list_archive(db, user_id, tag or None),
@@ -249,9 +359,45 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             "selected_tag": tag,
         })
 
+    @app.get("/wbs", response_class=HTMLResponse)
+    def wbs_page(
+        request: Request, db: Database,
+        project_id: str = "", mode: str = "week", week: str = "",
+        status: str = "all", signal: str = "all", q: str = "",
+    ):
+        """案件内の親子タスクを、週または日の予定表として表示する。"""
+        user_id = request.state.user_id
+        selected_project_id = None
+        if project_id and project_id.isascii() and project_id.isdecimal() and len(project_id) <= 19:
+            selected_project_id = int(project_id)
+        view = wbs.build_view(
+            db, user_id, project_id=selected_project_id, mode=mode, week=week,
+            status_filter=status, signal_filter=signal, search_query=q,
+        )
+        view["filter_query"] = urlencode({
+            "status": view["status_filter"], "signal": view["signal_filter"], "q": view["search_query"],
+        })
+        first_period = view["periods"][0]["start"] if view["periods"] else view["week_start"]
+        last_period = view["periods"][-1]["end"] if view["periods"] else view["week_start"]
+        first_date = date.fromisoformat(first_period)
+        last_date = date.fromisoformat(last_period)
+        view["period_label"] = (
+            f"{first_date.year}年{first_date.month}月{first_date.day}日から"
+            f"{last_date.month}月{last_date.day}日"
+        )
+        view["grid_columns"] = (
+            f"minmax(260px, 2fr) minmax(126px, .9fr) "
+            f"repeat({len(view['periods'])}, minmax(88px, 1fr))"
+        )
+        return templates.TemplateResponse(request, "wbs.html", {
+            **base_context(request, "wbs"),
+            **view,
+        })
+
     # ---- 日報 ----
 
     def report_context(request: Request, db: sqlite3.Connection, report_date: date, **extra) -> dict:
+        user_id = request.state.user_id
         return {
             **base_context(request, "report"),
             "report": reports.build_report_view(db, user_id, report_date),
@@ -270,6 +416,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         その場合は今の値をそのまま保つ(reports.save_draft が処理する)。
         """
         form = await request.form()
+        user_id = request.state.user_id
         report = reports.find_report(db, user_id, report_date)
         time_tracking_enabled = bool(report["time_tracking_enabled"]) if report else True
         details_enabled = bool(report["details_enabled"]) if report else True
@@ -323,6 +470,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     @app.post("/report/submit")
     async def submit_report(request: Request, db: Database, date: str = ""):
+        user_id = request.state.user_id
         report_date = parse_report_date(date)
         invalid_titles = await save_report_form(request, db, report_date)
         if invalid_titles:
@@ -333,6 +481,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     @app.post("/report/items/{task_id}/remove", response_class=HTMLResponse)
     def remove_report_item(task_id: int, request: Request, db: Database, date: str = ""):
+        user_id = request.state.user_id
         report_date = parse_report_date(date)
         reports.remove_item(db, user_id, task_id, report_date)
         return templates.TemplateResponse(request, "_report_content.html", report_context(request, db, report_date))
@@ -340,6 +489,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.post("/report/toggle-time-tracking", response_class=HTMLResponse)
     async def toggle_report_time_tracking(request: Request, db: Database, date: str = ""):
         """書きかけを保存してからON/OFFする。時刻の誤りがあれば入力欄を残して知らせる。"""
+        user_id = request.state.user_id
         report_date = parse_report_date(date)
         invalid_titles = await save_report_form(request, db, report_date)
         if invalid_titles:
@@ -352,6 +502,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.post("/report/toggle-details", response_class=HTMLResponse)
     async def toggle_report_details(request: Request, db: Database, date: str = ""):
         """書きかけを保存してからON/OFFする。時刻の誤りがあれば入力欄を残して知らせる。"""
+        user_id = request.state.user_id
         report_date = parse_report_date(date)
         invalid_titles = await save_report_form(request, db, report_date)
         if invalid_titles:
@@ -373,6 +524,50 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             return None
         return {"kind": "warn", "text": f"「{title}」のメモから困っている様子を検知し、相談中の付箋を付けました。違う場合は「解決した」で外せます。"}
 
+    @app.post("/projects", response_class=HTMLResponse)
+    def create_project(request: Request, db: Database, state: ViewState, name: Annotated[str, Form()] = ""):
+        user_id = request.state.user_id
+        try:
+            project_id = projects.create_project(db, user_id, name)
+        except projects.ProjectError as error:
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)})
+        return render_board(
+            request, db, state, {"kind": "ok", "text": f"案件「{name.strip()}」を作成しました。"},
+            highlight={"refresh_project_options": True, "project_management_open": True},
+        )
+
+    @app.post("/projects/{project_id}/rename", response_class=HTMLResponse)
+    def rename_project(
+        project_id: int, request: Request, db: Database, state: ViewState,
+        name: Annotated[str, Form()] = "",
+    ):
+        user_id = request.state.user_id
+        try:
+            projects.rename_project(db, user_id, project_id, name)
+        except projects.ProjectError as error:
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)})
+        return render_board(
+            request, db, state, {"kind": "ok", "text": "案件名を変更しました。"},
+            highlight={"refresh_project_options": True, "project_management_open": True},
+        )
+
+    @app.post("/projects/{project_id}/status/{status}", response_class=HTMLResponse)
+    def change_project_status(
+        project_id: int, status: str, request: Request, db: Database, state: ViewState,
+    ):
+        user_id = request.state.user_id
+        if status not in ("active", "closed"):
+            return render_board(request, db, state, {"kind": "warn", "text": "案件の状態を選び直してください。"})
+        try:
+            projects.set_project_closed(db, user_id, project_id, status == "closed")
+        except projects.ProjectError as error:
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)})
+        notice_text = "案件を終了扱いにしました。関連タスクと記録は残っています。" if status == "closed" else "案件を再開しました。"
+        return render_board(
+            request, db, state, {"kind": "ok", "text": notice_text},
+            highlight={"refresh_project_options": True, "project_management_open": True},
+        )
+
     @app.post("/tasks", response_class=HTMLResponse)
     def quick_add_task(
         request: Request, db: Database, state: ViewState,
@@ -384,8 +579,10 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         start_date: Annotated[str, Form()] = "",
         memo: Annotated[str, Form()] = "",
         parent_id: Annotated[str, Form()] = "",
+        project_id: Annotated[str, Form()] = "",
     ):
         """入力欄からタスクを追加する。追加先を指定しなければ「今日やる」に入れる。"""
+        user_id = request.state.user_id
         task_title, tag_names = tasks.split_title_and_tags(title)
         if not task_title:
             return render_board(request, db, state)
@@ -398,6 +595,14 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             candidate_ids = {parent["id"] for parent in tasks.list_parent_candidates(db, user_id)}
             if selected_parent_id not in candidate_ids:
                 return render_board(request, db, state, {"kind": "warn", "text": "選んだ親タスクは追加先にできません。画面を読み直してください。"})
+        selected_project_id = None
+        if project_id:
+            if not project_id.isascii() or not project_id.isdecimal() or len(project_id) > 19:
+                return render_board(request, db, state, {"kind": "warn", "text": "案件を選び直してください。"})
+            selected_project_id = int(project_id)
+            selected_project = projects.get_owned_project(db, user_id, selected_project_id)
+            if selected_project is None or selected_project["status"] != "active":
+                return render_board(request, db, state, {"kind": "warn", "text": "案件を選び直してください。"})
         today_iso = clock.today().isoformat()
         selected_due_date = due_date or (None if selected_parent_id is not None else today_iso)
         default_start_date = today_iso
@@ -411,12 +616,15 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             normalized_start_date = tasks.validate_start_date(selected_start_date, selected_due_date)
         except tasks.TaskDateError as error:
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
-        task_id = tasks.create_task(
-            db, user_id, task_title[:200], parent_id=selected_parent_id, tag_names=tag_names,
-            importance=tasks.clamp_level(importance), urgency=tasks.clamp_level(urgency),
-            due_date=selected_due_date, start_date=normalized_start_date,
-            memo=memo.strip()[:tasks.MAX_MEMO_LENGTH],
-        )
+        try:
+            task_id = tasks.create_task(
+                db, user_id, task_title[:200], parent_id=selected_parent_id, project_id=selected_project_id,
+                tag_names=tag_names, importance=tasks.clamp_level(importance), urgency=tasks.clamp_level(urgency),
+                due_date=selected_due_date, start_date=normalized_start_date,
+                memo=memo.strip()[:tasks.MAX_MEMO_LENGTH],
+            )
+        except tasks.TaskRelationshipError as error:
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)})
         if selected_parent_id is not None:
             today_candidate_ids = {task["id"] for task in daily.list_candidates(db, user_id)}
             if selected_parent_id in today_candidate_ids:
@@ -438,10 +646,14 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         task_id: int, request: Request, db: Database, state: ViewState, parent: OwnedTask,
         title: Annotated[str, Form()] = "",
     ):
+        user_id = request.state.user_id
         subtask_title, tag_names = tasks.split_title_and_tags(title)
         highlight = None
         if parent and parent["parent_id"] is None and subtask_title:  # サブタスクは1階層のみ
-            new_id = tasks.create_task(db, user_id, subtask_title[:200], parent_id=task_id, tag_names=tag_names)
+            try:
+                new_id = tasks.create_task(db, user_id, subtask_title[:200], parent_id=task_id, tag_names=tag_names)
+            except tasks.TaskRelationshipError as error:
+                return render_board(request, db, state, {"kind": "warn", "text": str(error)})
             # 親が「今日やる」にあれば、子も今日やるに入れて親の下に並べる
             if task_id in {task["id"] for task in daily.list_candidates(db, user_id)}:
                 daily.add_to_plan(db, new_id, clock.today())
@@ -451,6 +663,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.post("/tasks/{task_id}/status/{status}", response_class=HTMLResponse)
     def change_status(task_id: int, status: str, request: Request, db: Database, state: ViewState, task: OwnedTask):
         """状態を変更する。親の完了は進捗欄のボタンを押したときだけ行う。"""
+        user_id = request.state.user_id
         highlight, notice = None, None
         if task is None:
             notice = {"kind": "warn", "text": "操作できるタスクが見つかりません。画面を読み直してください。"}
@@ -459,6 +672,10 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         else:
             try:
                 tasks.set_status(db, task_id, status)
+                started_directly = status == "doing" and task["status"] == "todo"
+                completed_directly = status == "done" and task["status"] != "done"
+                if started_directly or completed_directly:
+                    reports.add_auto_candidate(db, user_id, task_id, clock.today())
                 if status == "done" and task["status"] != "done":
                     highlight = {"completed": task_id}
                     parent = tasks.get_owned_task(db, user_id, task["parent_id"]) if task["parent_id"] is not None else None
@@ -514,6 +731,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.post("/tasks/{task_id}/today", response_class=HTMLResponse)
     def toggle_today(task_id: int, request: Request, db: Database, state: ViewState, task: OwnedTask):
         """「今日やる」と「明日以降にやる」の間で移す。移した先が閉じていても見失わないよう、元に戻すボタン付きで知らせる。"""
+        user_id = request.state.user_id
         notice = None
         if task:
             was_today = daily.is_in_today(db, user_id, task_id)
@@ -528,6 +746,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.post("/tasks/{task_id}/report", response_class=HTMLResponse)
     def toggle_report_item(task_id: int, request: Request, db: Database, state: ViewState):
         """今日の日報に入れる/外す。選んだ内容はすぐ保存するので、画面を移っても消えない。"""
+        user_id = request.state.user_id
         reports.toggle_item(db, user_id, task_id, clock.today())
         return render_board(request, db, state)
 
@@ -556,14 +775,18 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         importance: Annotated[str, Form()] = "",
         urgency: Annotated[str, Form()] = "",
         parent_id: Annotated[str | None, Form()] = None,
+        project_id: Annotated[str | None, Form()] = None,
         confirm_clear_recurrence: Annotated[bool, Form()] = False,
     ):
+        user_id = request.state.user_id
         if task is None:
             return render_board(request, db, state, {"kind": "warn", "text": "操作できるタスクが見つかりません。"})
         # Formの既定値では空文字もNoneになるため、「解除」と「項目なし」を区別する。
         submitted_form = await request.form()
         if "parent_id" in submitted_form:
             parent_id = str(submitted_form["parent_id"])
+        if "project_id" in submitted_form:
+            project_id = str(submitted_form["project_id"])
         if "recurrence_rule" in submitted_form:
             recurrence_rule = str(submitted_form["recurrence_rule"])
         new_title = title.strip() or task["title"]
@@ -575,10 +798,21 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             "tag_text": tag_text, "recurrence_rule": new_recurrence_rule,
             "importance": new_importance, "urgency": new_urgency,
             "parent_id": parent_id if parent_id is not None else str(task["parent_id"] or ""),
+            "project_id": project_id if project_id is not None else str(task["project_id"] or ""),
         }
         old_section = daily.task_board_section(db, user_id, task_id)
         relationship_changed = False
         try:
+            selected_project_id = None
+            if project_id:
+                if not project_id.isascii() or not project_id.isdecimal() or len(project_id) > 19:
+                    raise projects.ProjectError("案件を選び直してください。")
+                selected_project_id = int(project_id)
+                selected_project = projects.get_owned_project(db, user_id, selected_project_id)
+                if selected_project is None or (
+                    selected_project["status"] != "active" and selected_project_id != task["project_id"]
+                ):
+                    raise projects.ProjectError("案件を選び直してください。終了案件へは移動できません。")
             normalized_start_date = tasks.validate_start_date(start_date, due_date)
             tasks.update_task(
                 db, task_id, title=new_title[:200], due_date=tasks.normalize_due_date(due_date),
@@ -593,11 +827,13 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
                     db, user_id, task_id, int(parent_id) if parent_id else None,
                     confirm_clear_recurrence=confirm_clear_recurrence,
                 )
+            if project_id is not None and not parent_id:
+                tasks.change_project(db, user_id, task_id, selected_project_id)
             tasks.set_recurrence_rule(
                 db, user_id, task_id, new_recurrence_rule or None,
                 confirm_clear_recurrence=confirm_clear_recurrence,
             )
-        except (tasks.TaskRelationshipError, tasks.TaskDateError) as error:
+        except (tasks.TaskRelationshipError, tasks.TaskDateError, projects.ProjectError) as error:
             db.rollback()
             return render_board(
                 request, db, state, {"kind": "warn", "text": str(error)}, highlight={"edit_draft": draft},
@@ -622,6 +858,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     @app.post("/ai/reports/{report_id}/undo", response_class=HTMLResponse)
     def undo_ai_report(report_id: int, request: Request, db: Database, state: ViewState):
+        user_id = request.state.user_id
         undone = ai_actions.undo_report(db, user_id, report_id)
         notice = {"kind": "ok", "text": "Copilot からの更新を取り消しました。"} if undone else None
         return render_board(request, db, state, notice)

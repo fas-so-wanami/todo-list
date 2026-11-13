@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}WBS - ToDo{% endblock %}
+{% block content %}
+<section id="main-content" class="wbs-page" aria-labelledby="wbs-title">
+  <div class="wbs-heading">
+    <div>
+      <h1 id="wbs-title">WBS</h1>
+      <p>案件の予定と進み具合</p>
+    </div>
+    {% if project and project.status == 'closed' %}<span class="wbs-project-closed">終了案件</span>{% endif %}
+  </div>
+
+  {% if projects %}
+  <form class="wbs-filter-form" method="get" action="/wbs">
+    <label for="wbs-project">案件</label>
+    <select id="wbs-project" name="project_id">
+      {% for option in projects %}
+      <option value="{{ option.id }}" {{ 'selected' if project and option.id == project.id }}>
+        {{ option.name }}{{ '（終了）' if option.status == 'closed' }}
+      </option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <input type="hidden" name="week" value="{{ week_start }}">
+    <label for="wbs-status">タスク</label>
+    <select id="wbs-status" name="status">
+      <option value="all" {{ 'selected' if status_filter == 'all' }}>すべて</option>
+      <option value="open" {{ 'selected' if status_filter == 'open' }}>未完了のみ</option>
+      <option value="done" {{ 'selected' if status_filter == 'done' }}>完了のみ</option>
+    </select>
+    <label for="wbs-signal">予定状態</label>
+    <select id="wbs-signal" name="signal">
+      <option value="all" {{ 'selected' if signal_filter == 'all' }}>すべて</option>
+      <option value="late" {{ 'selected' if signal_filter == 'late' }}>期限超過</option>
+      <option value="start-late" {{ 'selected' if signal_filter == 'start-late' }}>開始予定超過</option>
+      <option value="on-track" {{ 'selected' if signal_filter == 'on-track' }}>遅れなし</option>
+      <option value="none" {{ 'selected' if signal_filter == 'none' }}>判定なし</option>
+    </select>
+    <label for="wbs-search">タスク名</label>
+    <input id="wbs-search" name="q" type="search" value="{{ search_query }}" maxlength="100" placeholder="名前で検索">
+    <button type="submit" class="primary">絞り込む</button>
+    {% if status_filter != 'all' or signal_filter != 'all' or search_query %}
+    <a class="wbs-reset-filters" href="/wbs?project_id={{ project.id }}&amp;mode={{ mode }}&amp;week={{ week_start }}">解除</a>
+    {% endif %}
+  </form>
+
+  <p class="wbs-filter-count" aria-live="polite">{{ tasks|length }} / {{ total_task_count }} 件を表示</p>
+
+  <div class="wbs-controls">
+    <div class="wbs-mode" role="group" aria-label="表示単位">
+      <a href="/wbs?project_id={{ project.id }}&amp;mode=week&amp;week={{ week_start }}&amp;{{ filter_query }}"
+         class="{{ 'active' if mode == 'week' }}" {{ 'aria-current=page' if mode == 'week' }}>週表示</a>
+      <a href="/wbs?project_id={{ project.id }}&amp;mode=day&amp;week={{ week_start }}&amp;{{ filter_query }}"
+         class="{{ 'active' if mode == 'day' }}" {{ 'aria-current=page' if mode == 'day' }}>日表示</a>
+    </div>
+    <div class="wbs-period-nav" aria-label="表示期間">
+      <a href="/wbs?project_id={{ project.id }}&amp;mode={{ mode }}&amp;week={{ previous_week }}&amp;{{ filter_query }}" aria-label="前の週">← 前へ</a>
+      <strong>{{ period_label }}</strong>
+      <a href="/wbs?project_id={{ project.id }}&amp;mode={{ mode }}&amp;week={{ next_week }}&amp;{{ filter_query }}" aria-label="次の週">次へ →</a>
+    </div>
+  </div>
+
+  <div class="wbs-legend" aria-label="予定の状態">
+    <span><i class="wbs-dot on-track"></i>遅れなし</span>
+    <span><i class="wbs-dot start-late"></i>開始予定超過</span>
+    <span><i class="wbs-dot late"></i>期限超過</span>
+    <span><i class="wbs-dot done"></i>完了</span>
+  </div>
+
+  {% if tasks %}
+  <div class="wbs-scroll">
+    <div class="wbs-grid" role="table" aria-label="{{ project.name }}のWBS" style="--wbs-columns: {{ grid_columns }}">
+      <div class="wbs-row wbs-header" role="row">
+        <div role="columnheader">タスク</div>
+        <div role="columnheader">予定の状態</div>
+        {% for period in periods %}
+        <div role="columnheader">
+          {{ period.label }}
+          {% if period.today_position is not none %}
+          <span class="wbs-today-label">今日</span>
+          <span class="wbs-today-marker" style="--today-position: {{ period.today_position }}%" aria-hidden="true"></span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% for task in tasks %}
+      <div class="wbs-row wbs-task-row status-{{ task.status }}" role="row">
+        <div class="wbs-task-name depth-{{ task.depth }}" role="cell">
+          {% if task.depth %}<span class="wbs-tree-mark" aria-hidden="true">└</span>{% endif %}
+          {% if not task.depth and task.parent_id and task.parent_title %}<span class="wbs-parent-context">{{ task.parent_title }} ›</span>{% endif %}
+          <strong>{{ task.title }}</strong>
+          <span class="wbs-status status-{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
+          <span class="wbs-dates">{{ task.start_date or '開始日なし' }} ～ {{ task.due_date or '期限なし' }}</span>
+        </div>
+        <div class="wbs-signal signal-{{ task.schedule_class }}" role="cell">
+          <i class="wbs-dot {{ task.schedule_class }}" aria-hidden="true"></i>{{ task.schedule_label }}
+        </div>
+        {% for period in periods %}
+        <div class="wbs-period-cell" role="cell">
+          {% if period.today_position is not none %}
+          <span class="wbs-today-marker" style="--today-position: {{ period.today_position }}%" aria-hidden="true"></span>
+          {% endif %}
+          {% set bar_class = task.bar_cells[loop.index0] %}
+          {% if bar_class %}<span class="wbs-bar {{ bar_class }}{{ ' complete' if task.status == 'done' }}" aria-label="予定"></span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  {% if total_task_count %}
+  <p class="wbs-empty">条件に合うタスクがありません。絞り込みを解除するか、条件を変更してください。</p>
+  {% else %}
+  <p class="wbs-empty">この案件にはタスクがありません。親タスクの編集から案件を設定できます。</p>
+  {% endif %}
+  {% endif %}
+  <p class="wbs-footnote">予定日はタスクの編集欄で変更できます。日付が未設定のタスクは予定バーと遅れ判定を表示しません。</p>
+  {% else %}
+  <p class="wbs-empty">案件がありません。タスク画面から案件を作成してください。</p>
+  {% endif %}
+</section>
+{% endblock %}

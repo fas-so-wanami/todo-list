@@ -111,6 +111,28 @@ def report_task_ids(db: sqlite3.Connection, user_id: int, report_date: date) -> 
     )}
 
 
+def add_auto_candidate(db: sqlite3.Connection, user_id: int, task_id: int, report_date: date) -> bool:
+    """開始・完了したタスクを日報へ一度だけ追加し、手で外した日は戻さない。"""
+    task = tasks.get_owned_task(db, user_id, task_id)
+    if task is None:
+        return False
+    date_text = report_date.isoformat()
+    if db.execute(
+        "SELECT 1 FROM daily_report_exclusions WHERE user_id = ? AND task_id = ? AND report_date = ?",
+        (user_id, task_id, date_text),
+    ).fetchone():
+        return False
+    report = get_or_create_report(db, user_id, report_date)
+    logged_minutes = daily.get_minutes(db, task_id, report_date) or 0
+    inserted = db.execute(
+        "INSERT OR IGNORE INTO daily_report_items (report_id, task_id, minutes) VALUES (?, ?, ?)",
+        (report["id"], task_id, logged_minutes),
+    ).rowcount
+    if inserted:
+        _touch(db, report["id"])
+    return bool(inserted)
+
+
 def _touch(db: sqlite3.Connection, report_id: int) -> None:
     """内容が変わったことを記録する。提出済みなら「修正あり(未提出)」にする。"""
     db.execute(
@@ -129,6 +151,10 @@ def toggle_item(db: sqlite3.Connection, user_id: int, task_id: int, report_date:
     if task_id in report_task_ids(db, user_id, report_date):
         remove_item(db, user_id, task_id, report_date)
         return False
+    db.execute(
+        "DELETE FROM daily_report_exclusions WHERE user_id = ? AND task_id = ? AND report_date = ?",
+        (user_id, task_id, report_date.isoformat()),
+    )
     logged_minutes = daily.get_minutes(db, task_id, report_date) or 0
     db.execute(
         "INSERT INTO daily_report_items (report_id, task_id, minutes) VALUES (?, ?, ?)",
@@ -146,6 +172,10 @@ def remove_item(db: sqlite3.Connection, user_id: int, task_id: int, report_date:
         "DELETE FROM daily_report_items WHERE report_id = ? AND task_id = ?", (report["id"], task_id)
     ).rowcount
     if deleted:
+        db.execute(
+            "INSERT OR IGNORE INTO daily_report_exclusions (user_id, task_id, report_date) VALUES (?, ?, ?)",
+            (user_id, task_id, report_date.isoformat()),
+        )
         daily.set_minutes(db, task_id, report_date, 0)
         _touch(db, report["id"])
 
@@ -198,10 +228,78 @@ def save_draft(
 def submit(db: sqlite3.Connection, user_id: int, report_date: date) -> None:
     report = get_or_create_report(db, user_id, report_date)
     now = clock.now_iso()
+    _replace_submission_snapshot(db, report, now)
     db.execute(
         "UPDATE daily_reports SET submitted_at = ?, updated_at = ?, has_unsubmitted_changes = 0 WHERE id = ?",
         (now, now, report["id"]),
     )
+
+
+def _replace_submission_snapshot(db: sqlite3.Connection, report: sqlite3.Row, submitted_at: str) -> None:
+    """提出時点の入力内容を別保存し、修正中の下書きに影響されないようにする。"""
+    db.execute(
+        """INSERT INTO daily_report_snapshots
+           (report_id, user_id, report_date, work_style, leave_types, comment, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(report_id) DO UPDATE SET
+               user_id = excluded.user_id,
+               report_date = excluded.report_date,
+               work_style = excluded.work_style,
+               leave_types = excluded.leave_types,
+               comment = excluded.comment,
+               submitted_at = excluded.submitted_at""",
+        (
+            report["id"], report["user_id"], report["report_date"], report["work_style"],
+            report["leave_types"], report["comment"], submitted_at,
+        ),
+    )
+    db.execute(
+        "DELETE FROM daily_report_snapshot_items WHERE user_id = ? AND report_id = ?",
+        (report["user_id"], report["id"]),
+    )
+    db.execute(
+        """INSERT INTO daily_report_snapshot_items
+           (report_id, user_id, source_task_id, task_title, parent_title, minutes)
+           SELECT ?, ?, t.id, t.title, COALESCE(p.title, ''), i.minutes
+           FROM daily_report_items i
+           JOIN tasks t ON t.id = i.task_id AND t.user_id = ?
+           LEFT JOIN tasks p ON p.id = t.parent_id AND p.user_id = t.user_id
+           WHERE i.report_id = ?""",
+        (report["id"], report["user_id"], report["user_id"], report["id"]),
+    )
+
+
+def get_submission_snapshot(
+    db: sqlite3.Connection, user_id: int, report_date: date,
+) -> dict | None:
+    """本人の日付に対応する最新提出版を、下書きとは独立して返す。"""
+    snapshot = db.execute(
+        "SELECT * FROM daily_report_snapshots WHERE user_id = ? AND report_date = ?",
+        (user_id, report_date.isoformat()),
+    ).fetchone()
+    if snapshot is None:
+        return None
+    items = db.execute(
+        "SELECT source_task_id, task_title, parent_title, minutes "
+        "FROM daily_report_snapshot_items WHERE user_id = ? AND report_id = ? ORDER BY rowid",
+        (user_id, snapshot["report_id"]),
+    ).fetchall()
+    return {**dict(snapshot), "task_items": [dict(item) for item in items]}
+
+
+def backfill_unchanged_submissions(db: sqlite3.Connection) -> None:
+    """提出後に修正されていない旧日報だけを、提出版として安全に初期保存する。"""
+    reports = db.execute(
+        """SELECT * FROM daily_reports r
+           WHERE r.submitted_at IS NOT NULL AND r.has_unsubmitted_changes = 0
+             AND NOT EXISTS (
+                 SELECT 1 FROM daily_report_snapshots s
+                 WHERE s.user_id = r.user_id AND s.report_date = r.report_date
+             )
+           ORDER BY r.user_id, r.report_date""",
+    ).fetchall()
+    for report in reports:
+        _replace_submission_snapshot(db, report, report["submitted_at"])
 
 
 def mark_reports_changed_for_task(db: sqlite3.Connection, task_id: int) -> None:

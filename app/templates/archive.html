@@ -9,8 +9,8 @@
   </div>
 
   {% if tag_names %}
-  <div class="filter-bar" role="navigation" aria-label="案件で絞り込み">
-    <span class="filter-label">案件</span>
+  <div class="filter-bar" role="navigation" aria-label="タグで絞り込み">
+    <span class="filter-label">タグ</span>
     <a class="chip filter{{ ' on' if not selected_tag }}" href="/archive">すべて</a>
     {% for tag_name in tag_names %}
     <a class="chip filter{{ ' on' if selected_tag == tag_name }}" href="/archive?tag={{ tag_name|urlencode }}">#{{ tag_name }}</a>
@@ -27,6 +27,7 @@
         <div class="archive-line">
           {% if not task.subtask_total %}<span class="done-stamp" aria-label="完了">済</span>{% endif %}
           <span class="title-text">{{ task.title }}</span>
+          {% if task.project_name %}<span class="chip project-chip">案件: {{ task.project_name }}</span>{% endif %}
           {{ memo_chip(task) }}
           {% if task.subtask_total %}{{ progress_summary(task) }}{% endif %}
           <button type="button" class="task-state-action"

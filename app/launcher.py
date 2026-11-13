@@ -7,6 +7,7 @@
 2. 空いていればサーバーを起動し、準備ができてからブラウザを開く。
 """
 import json
+import os
 import socket
 import sys
 import threading
@@ -14,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
+from pathlib import Path
 
 import uvicorn
 
@@ -28,6 +30,7 @@ PORT_FREE = "free"
 SAME_VERSION = "same"
 OLD_VERSION = "old"
 OTHER_PROGRAM = "other"
+LOCAL_AUTH_SETTINGS_PATH = Path(__file__).resolve().parent.parent / "data" / "local_auth.json"
 
 
 def is_port_open() -> bool:
@@ -77,6 +80,23 @@ def check_port_state(current_version: str) -> str:
     return SAME_VERSION if running_version == current_version else OLD_VERSION
 
 
+def load_local_auth_settings() -> None:
+    """Git管理外のローカル設定から起動モードとデータ所有者を読み込む。"""
+    if not LOCAL_AUTH_SETTINGS_PATH.exists():
+        return
+    try:
+        with LOCAL_AUTH_SETTINGS_PATH.open(encoding="utf-8") as settings_file:
+            settings = json.load(settings_file)
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{LOCAL_AUTH_SETTINGS_PATH}を読み込めません: {error}") from error
+    if not isinstance(settings, dict):
+        raise ValueError(f"{LOCAL_AUTH_SETTINGS_PATH}はJSONの項目一覧にしてください。")
+    for key in ("TODO_AUTH_MODE", "TODO_DATA_OWNER_EMAIL"):
+        value = settings.get(key)
+        if isinstance(value, str) and value.strip():
+            os.environ.setdefault(key, value.strip())
+
+
 def open_browser_when_ready(server: uvicorn.Server) -> None:
     deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
     while not server.started:
@@ -97,6 +117,11 @@ def run_server() -> None:
 
 
 def main() -> int:
+    try:
+        load_local_auth_settings()
+    except ValueError as error:
+        print(f"[エラー] {error}")
+        return 1
     state = check_port_state(compute_app_version())
     if state == SAME_VERSION:
         print("ToDo はすでに起動しています。ブラウザで開きます。")

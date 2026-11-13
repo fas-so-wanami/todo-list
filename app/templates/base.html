@@ -28,7 +28,7 @@
 </head>
 <body class="{% block body_class %}{% endblock %}" hx-target="#main-content" hx-swap="outerHTML transition:true">
   {% block header %}
-  <header class="app-header">
+  <header class="app-header{% if development_login_enabled %} development-header{% endif %}">
     <div class="app-header-inner">
       <a class="brand" href="/" aria-label="ToDo 今日の画面へ">
         <span class="brand-mark" aria-hidden="true">
@@ -38,6 +38,7 @@
       </a>
       <nav class="nav" aria-label="画面切り替え">
         <a href="/" class="{{ 'active' if view == 'board' }}" {{ 'aria-current=page' if view == 'board' }}>タスク</a>
+        <a href="/wbs" class="{{ 'active' if view == 'wbs' }}" {{ 'aria-current=page' if view == 'wbs' }}>WBS</a>
         <a href="/report" class="{{ 'active' if view == 'report' }}" {{ 'aria-current=page' if view == 'report' }}>日報</a>
         <a href="/archive" class="{{ 'active' if view == 'archive' }}" {{ 'aria-current=page' if view == 'archive' }}>アーカイブ</a>
       </nav>
@@ -55,6 +56,13 @@
         <button type="button" class="header-btn" id="open-mini" title="今日やるタスクだけを小さな窓で開く">ミニ表示</button>
         <span class="today-label">{{ today_label }}</span>
       </div>
+      {% if development_login_enabled %}
+      <div class="dev-user-tools">
+        <span class="dev-user-label">開発: {{ current_user_name }}</span>
+        <a class="header-btn" href="/login">ユーザー切替</a>
+        <form method="post" action="/logout"><button type="submit" class="header-btn">ログアウト</button></form>
+      </div>
+      {% endif %}
     </div>
   </header>
   {% endblock %}

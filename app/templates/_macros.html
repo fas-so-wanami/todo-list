@@ -141,6 +141,7 @@
         {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
         <span class="title-text">{{ task.title }}</span>
         {% for tag_name in task.tags %}<span class="chip tag">#{{ tag_name }}</span>{% endfor %}
+        {% if task.project_name %}<span class="chip project-chip">案件: {{ task.project_name }}</span>{% endif %}
         {{ memo_chip(task) }}
         {% if task.is_long_running %}<span class="chip marker" title="作業時間の累計が5時間以上">累計 {{ task.total_minutes|duration }}</span>{% endif %}
         {% if is_done and task.completed_date and task.completed_date != today_iso %}<span class="done-date">{{ task.completed_date|month_day }} 完了</span>{% endif %}
@@ -247,7 +248,19 @@
         {{ level_buttons("urgency", "緊急性", edit_values.urgency) }}
         <label>期限 <input type="date" name="due_date" value="{{ edit_values.due_date or '' }}"></label>
         <label>開始日 <input type="date" name="start_date" value="{{ edit_values.start_date or '' }}"></label>
-        <label>タグ(案件) <input name="tag_text" value="{{ edit_values.tag_text }}" placeholder="案件A 案件B"></label>
+        <label>タグ <input name="tag_text" value="{{ edit_values.tag_text }}" placeholder="例: 要確認 優先"></label>
+        {% if not task.parent_id %}
+        <label>案件
+          <select name="project_id">
+            <option value="" {{ 'selected' if not edit_values.project_id }}>案件なし</option>
+            {% for project in all_projects %}
+            <option value="{{ project.id }}" {{ 'selected' if edit_values.project_id|string == project.id|string }} {{ 'disabled' if project.status == 'closed' and edit_values.project_id|string != project.id|string }}>{{ project.name }}{{ '（終了）' if project.status == 'closed' }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% elif task.project_name %}
+        <p class="task-parent-note">案件「{{ task.project_name }}」は親タスクから引き継いでいます。</p>
+        {% endif %}
         {% if not task.parent_id %}
         <label>繰り返し
           <select name="recurrence_rule">
@@ -319,7 +332,7 @@
       <span class="add-more-plus" aria-hidden="true"></span>
       <span class="add-more-label">詳しく書く</span>
       <span class="add-more-items" aria-hidden="true">
-        <span>期限</span><span>開始日</span><span>重要度</span><span>緊急性</span><span>メモ</span><span>追加先</span><span>親タスク</span>
+        <span>期限</span><span>開始日</span><span>重要度</span><span>緊急性</span><span>メモ</span><span>追加先</span><span>親タスク</span><span>案件</span>
       </span>
       <span class="add-more-state" aria-hidden="true"></span>
     </summary>
@@ -336,6 +349,14 @@
           <option value="">親なし</option>
           {% for parent in parent_candidates %}
           <option value="{{ parent.id }}">{{ parent.title }}（No.{{ parent.id }}）</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field-label">案件（親タスクを選ぶと親から引き継ぎ）
+        <select name="project_id" id="quick-add-project-options">
+          <option value="">案件なし</option>
+          {% for project in project_options %}
+          <option value="{{ project.id }}">{{ project.name }}</option>
           {% endfor %}
         </select>
       </label>
