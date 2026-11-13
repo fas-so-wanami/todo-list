@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}開発ユーザー選択 - ToDo{% endblock %}
+{% block header %}{% endblock %}
+{% block content %}
+<section id="main-content" class="dev-login-page" aria-labelledby="dev-login-title">
+  <h1 id="dev-login-title">開発ユーザー選択</h1>
+  <p>ローカルでユーザーごとの表示を確かめる画面です。パスワードは使いません。</p>
+  <form method="post" action="/dev-login">
+    <label for="dev-user">利用者</label>
+    <select id="dev-user" name="user_id" required>
+      {% for user in users %}
+      <option value="{{ user.id }}">{{ user.name }}（{{ user.email }}）</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="primary">このユーザーで開く</button>
+  </form>
+</section>
+{% endblock %}

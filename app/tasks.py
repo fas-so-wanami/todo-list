@@ -4,7 +4,7 @@ import re
 import sqlite3
 from datetime import date, timedelta
 
-from app import clock
+from app import clock, projects
 
 STATUSES = ("todo", "doing", "done")
 STATUS_LABELS = {"todo": "未着手", "doing": "進行中", "done": "完了"}
@@ -107,6 +107,8 @@ def create_task(
     title: str,
     *,
     parent_id: int | None = None,
+    project_id: int | None = None,
+    allow_closed_project_child: bool = False,
     importance: int = 2,
     urgency: int = 2,
     due_date: str | None = None,
@@ -119,14 +121,22 @@ def create_task(
         parent = get_owned_task(db, user_id, parent_id)
         if parent is None or parent["parent_id"] is not None:
             raise TaskRelationshipError("子を追加できる親タスクが見つかりません。親子は1段だけにできます。")
+        if project_id is not None and project_id != parent["project_id"]:
+            raise TaskRelationshipError("子タスクは親タスクと同じ案件になります。")
+        project_id = parent["project_id"]
+        parent_project = projects.get_owned_project(db, user_id, project_id) if project_id is not None else None
+        if parent_project is not None and parent_project["status"] != "active" and not allow_closed_project_child:
+            raise TaskRelationshipError("終了した案件には子タスクを追加できません。")
         if recurrence_rule:
             raise TaskRelationshipError("子タスクの繰り返しは設定できません。親側で設定してください。")
+    elif project_id is not None and projects.get_owned_project(db, user_id, project_id) is None:
+        raise TaskRelationshipError("選んだ案件が見つかりません。画面を読み直してください。")
     cursor = db.execute(
-        """INSERT INTO tasks (user_id, parent_id, title, importance, urgency, due_date, start_date,
+        """INSERT INTO tasks (user_id, parent_id, project_id, title, importance, urgency, due_date, start_date,
                               memo, recurrence_rule, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            user_id, parent_id, title.strip(), clamp_level(importance), clamp_level(urgency),
+            user_id, parent_id, project_id, title.strip(), clamp_level(importance), clamp_level(urgency),
             normalize_due_date(due_date), validate_start_date(start_date, due_date),
             memo, normalize_recurrence(recurrence_rule),
             clock.now_iso(),
@@ -157,8 +167,10 @@ class TaskRelationshipError(ValueError):
 def list_parent_candidates(db: sqlite3.Connection, user_id: int) -> list[sqlite3.Row]:
     """絞り込み中も全案件から親を選べるよう、本人の未完了の親だけを返す。"""
     return db.execute(
-        "SELECT id, title FROM tasks WHERE user_id = ? AND parent_id IS NULL "
-        "AND status != 'done' ORDER BY title, id", (user_id,),
+        "SELECT t.id, t.title FROM tasks t WHERE t.user_id = ? AND t.parent_id IS NULL "
+        "AND t.status != 'done' AND (t.project_id IS NULL OR EXISTS ("
+        "SELECT 1 FROM projects p WHERE p.id = t.project_id AND p.user_id = t.user_id "
+        "AND p.status = 'active')) ORDER BY t.title, t.id", (user_id,),
     ).fetchall()
 
 
@@ -181,19 +193,46 @@ def change_parent(
             raise TaskRelationshipError("自分自身を親にはできません。")
         if parent is None or parent["parent_id"] is not None or parent["status"] == "done":
             raise TaskRelationshipError("親には、本人の未完了の親タスクだけを選べます。")
+        parent_project = projects.get_owned_project(db, user_id, parent["project_id"]) if parent["project_id"] else None
+        if parent_project is not None and parent_project["status"] != "active":
+            raise TaskRelationshipError("終了した案件のタスクは親にできません。")
         if db.execute(
             "SELECT 1 FROM tasks WHERE user_id = ? AND parent_id = ?", (user_id, task_id)
         ).fetchone():
             raise TaskRelationshipError("子を持つタスクを別の親の子にはできません。親子は1段だけです。")
         if task["recurrence_rule"] and not confirm_clear_recurrence:
             raise TaskRelationshipError("子にする前に、このタスクの繰り返しを外すことを確認してください。")
-        _write_fields(db, task_id, {"parent_id": parent_id, "recurrence_rule": None})
+        _write_fields(db, task_id, {
+            "parent_id": parent_id, "project_id": parent["project_id"], "recurrence_rule": None,
+        })
     else:
         _write_fields(db, task_id, {"parent_id": None})
     if previous_parent_id is not None:
         synchronize_parent_status(db, user_id, previous_parent_id)
     if parent_id is not None:
         synchronize_parent_status(db, user_id, parent_id)
+    return True
+
+
+def change_project(
+    db: sqlite3.Connection, user_id: int, task_id: int, project_id: int | None,
+) -> bool:
+    """親タスクと子を同じ案件へ移し、作業記録や日報はそのまま保つ。"""
+    task = get_owned_task(db, user_id, task_id)
+    if task is None:
+        raise TaskRelationshipError("操作できるタスクが見つかりません。")
+    if task["parent_id"] is not None:
+        raise TaskRelationshipError("子タスクの案件は親タスクから引き継ぎます。")
+    if task["project_id"] == project_id:
+        return False
+    if project_id is not None:
+        project = projects.get_owned_project(db, user_id, project_id)
+        if project is None or project["status"] != "active":
+            raise TaskRelationshipError("案件を選び直してください。終了した案件には移動できません。")
+    db.execute(
+        "UPDATE tasks SET project_id = ? WHERE user_id = ? AND (id = ? OR parent_id = ?)",
+        (project_id, user_id, task_id, task_id),
+    )
     return True
 
 
@@ -495,7 +534,8 @@ def create_next_occurrence(db: sqlite3.Connection, completed_task: sqlite3.Row) 
         )]
         created_id = create_task(
             db, source["user_id"], source["title"],
-            parent_id=None if is_parent else next_task_id,
+            parent_id=None if is_parent else next_task_id, project_id=source["project_id"],
+            allow_closed_project_child=not is_parent,
             importance=source["importance"], urgency=source["urgency"], due_date=due_date, start_date=start_date,
             memo=source["memo"], tag_names=tag_names,
             recurrence_rule=completed_task["recurrence_rule"] if is_parent else None,
@@ -563,6 +603,14 @@ def enrich(db: sqlite3.Connection, rows: list[sqlite3.Row]) -> list[dict]:
         parent_titles = {row["id"]: row["title"] for row in db.execute(
             f"SELECT id, title FROM tasks WHERE id IN ({','.join('?' * len(parent_ids))})", parent_ids)}
 
+    project_ids = sorted({task["project_id"] for task in tasks if task["project_id"] is not None})
+    project_names = {}
+    if project_ids:
+        project_names = {row["id"]: row["name"] for row in db.execute(
+            f"SELECT id, name FROM projects WHERE user_id = ? AND id IN ({','.join('?' * len(project_ids))})",
+            [tasks[0]["user_id"], *project_ids],
+        )}
+
     for task in tasks:
         total_minutes = minutes_by_task.get(task["id"], 0) or 0
         subtask_count = subtask_counts.get(task["id"])
@@ -580,6 +628,7 @@ def enrich(db: sqlite3.Connection, rows: list[sqlite3.Row]) -> list[dict]:
         )
         task["is_due_today"] = task["status"] != "done" and task["due_date"] == today_iso
         task["parent_title"] = parent_titles.get(task["parent_id"])
+        task["project_name"] = project_names.get(task["project_id"])
         task["is_waiting"] = task["waiting_since"] is not None
         task["tag_text"] = " ".join(task["tags"])
     return tasks

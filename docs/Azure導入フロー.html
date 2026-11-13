@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azure導入の進め方 | ToDoリスト</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17233c;
+      --ink-soft: #52617a;
+      --navy: #29477f;
+      --navy-soft: #eaf0fb;
+      --paper: #f4f6fa;
+      --sheet: #fff;
+      --line: #d7deea;
+      --green: #276247;
+      --green-soft: #e8f4ed;
+      --amber: #805900;
+      --amber-soft: #fff5d9;
+      --red: #943d32;
+      --red-soft: #faece9;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.7 "Yu Gothic UI", "Meiryo", sans-serif;
+    }
+    a { color: var(--navy); }
+    a:focus-visible { outline: 3px solid #d09317; outline-offset: 3px; }
+    .page { width: min(100% - 36px, 1020px); margin: 0 auto; padding: 32px 0 64px; }
+    .hero {
+      padding: 34px clamp(22px, 5vw, 52px);
+      border-radius: 18px;
+      background: var(--navy);
+      color: #fff;
+      box-shadow: 0 12px 30px #17233c1c;
+    }
+    .eyebrow { margin: 0 0 8px; color: #dce7ff; font-size: 13px; font-weight: 700; letter-spacing: .08em; }
+    h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.3; }
+    .hero p:last-child { max-width: 760px; margin: 14px 0 0; color: #edf2ff; }
+    .jump-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .jump-links a {
+      display: inline-block;
+      padding: 5px 12px;
+      border: 1px solid #ffffff70;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .jump-links a:hover { background: #ffffff1a; }
+    section { margin-top: 34px; }
+    h2 { margin: 0 0 14px; font-size: 23px; line-height: 1.4; }
+    h3 { margin: 0 0 6px; font-size: 17px; line-height: 1.45; }
+    p { margin: 6px 0; }
+    ul { margin: 8px 0 0; padding-left: 1.3em; }
+    li + li { margin-top: 4px; }
+    .section-lead { margin: -6px 0 16px; color: var(--ink-soft); }
+    .first-action {
+      padding: 20px 24px;
+      border: 1px solid #e8d18c;
+      border-left: 6px solid #d49a1f;
+      border-radius: 12px;
+      background: var(--amber-soft);
+    }
+    .first-action h2 { margin-bottom: 6px; }
+    .first-action strong { color: #604600; }
+    .questions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; }
+    .questions li { padding-left: 2px; }
+    .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .status-card, .step-card, .done-card, .caution-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--sheet);
+      box-shadow: 0 3px 12px #17233c08;
+    }
+    .status-card { padding: 16px; }
+    .status-card p { color: var(--ink-soft); font-size: 14px; }
+    .status {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .status.done { background: var(--green-soft); color: var(--green); }
+    .status.pending { background: var(--amber-soft); color: var(--amber); }
+    .flow {
+      position: relative;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: phase;
+    }
+    .flow::before {
+      position: absolute;
+      top: 28px;
+      bottom: 42px;
+      left: 22px;
+      width: 3px;
+      border-radius: 3px;
+      background: var(--line);
+      content: "";
+    }
+    .flow-step {
+      position: relative;
+      min-height: 64px;
+      padding: 0 0 20px 64px;
+      counter-increment: phase;
+    }
+    .flow-step::before {
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      left: 0;
+      display: grid;
+      width: 47px;
+      height: 47px;
+      place-items: center;
+      border: 3px solid var(--paper);
+      border-radius: 50%;
+      background: var(--navy);
+      color: #fff;
+      content: counter(phase, decimal-leading-zero);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .step-card { padding: 17px 20px 18px; }
+    .step-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+    .step-heading h3 { margin: 0; }
+    .step-card > p, .step-card li { color: var(--ink-soft); }
+    .step-card ul { padding-left: 1.2em; }
+    .tag {
+      display: inline-block;
+      padding: 1px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink-soft);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .gate {
+      margin: 0 0 20px 64px;
+      padding: 11px 16px;
+      border: 1px dashed #9aa8be;
+      border-radius: 10px;
+      background: #edf1f7;
+      color: var(--ink);
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .gate span { display: block; color: var(--ink-soft); font-size: 12px; font-weight: 400; }
+    .branch-note {
+      margin: 0 0 20px 64px;
+      padding: 10px 14px;
+      border-left: 3px solid #9aa8be;
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+    .done-card { padding: 22px 24px; border-color: #b8d7c5; background: var(--green-soft); }
+    .done-card h2 { color: var(--green); }
+    .done-card li::marker { color: var(--green); }
+    .caution-card { padding: 18px 22px; border-color: #efc3bc; background: var(--red-soft); }
+    .caution-card h2 { color: var(--red); }
+    .caution-card li { color: #633b36; }
+    .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; }
+    .footer p { margin: 4px 0; }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #edf1f7;
+      color: #283c63;
+      font: .9em Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 700px) {
+      .page { width: min(100% - 24px, 1020px); padding-top: 12px; }
+      .hero { border-radius: 12px; }
+      .status-grid, .questions { grid-template-columns: 1fr; }
+      .flow-step { padding-left: 54px; }
+      .flow::before { left: 19px; }
+      .flow-step::before { width: 41px; height: 41px; }
+      .step-card { padding: 15px; }
+      .gate, .branch-note { margin-left: 54px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      .page { width: 100%; padding: 0; }
+      .hero { border-radius: 0; box-shadow: none; print-color-adjust: exact; }
+      .jump-links { display: none; }
+      .status-card, .step-card, .done-card, .caution-card { box-shadow: none; break-inside: avoid; }
+      section, .flow-step, .gate { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">ToDoリスト / チーム利用への準備</p>
+      <h1>Azure導入の進め方</h1>
+      <p>ローカルで試作したアプリを、会社のMicrosoft 365ログインでチームが安全に使える状態へ。準備から本番利用まで、上から順に確認できるロードマップです。</p>
+      <nav class="jump-links" aria-label="ページ内の移動">
+        <a href="#first">最初にすること</a>
+        <a href="#current">いまの状態</a>
+        <a href="#flow">導入フロー</a>
+        <a href="#complete">完了の目印</a>
+      </nav>
+    </header>
+
+    <section id="first" class="first-action" aria-labelledby="first-title">
+      <h2 id="first-title">まず最初にすること</h2>
+      <p><strong>Azure管理者・Microsoft 365管理者に、利用できる環境と権限を確認する。</strong>まだ実データをAzureへ移したり、公開設定を変えたりする段階ではありません。</p>
+      <ul class="questions">
+        <li>このアプリ専用のAzure環境を作れるサブスクリプションと担当者はいる？</li>
+        <li>Linux版App ServiceとPython 3.11を使ってよい？費用・無料枠・利用上限はどう確認する？</li>
+        <li>Entra IDの組み込み認証(Easy Auth)を有効にする権限はある？</li>
+        <li>試験利用できるメンバー、上司役、利用開始時期は誰が決める？</li>
+        <li>タスクや相談メモをAzureに保存すること、保存先・バックアップ方法は社内ルールに合う？</li>
+      </ul>
+    </section>
+
+    <section id="current" aria-labelledby="current-title">
+      <h2 id="current-title">いまの状態</h2>
+      <p class="section-lead">認証とユーザー別データ分離の土台はできています。Azureの設定や、チームでの運用確認はこれからです。</p>
+      <div class="status-grid">
+        <article class="status-card">
+          <span class="status done">土台あり</span>
+          <h3>本人ごとのデータ分離</h3>
+          <p>local / dev / entra の認証モードと、ユーザーごとのタスク・日報の分離を実装・テスト済み。Azureでの実認証は未確認です。</p>
+        </article>
+        <article class="status-card">
+          <span class="status pending">これから</span>
+          <h3>Azure向けの設定と公開</h3>
+          <p>Easy Auth、許可メール、Azureのホスト名、起動方法、永続DBの保存先は、Azure上で設定・検証する必要があります。</p>
+        </article>
+        <article class="status-card">
+          <span class="status pending">これから</span>
+          <h3>上司画面と運用準備</h3>
+          <p>上司が長時間・期限超過・相談中を確認する画面、バックアップと復元の手順は未実装・未確認です。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="flow" aria-labelledby="flow-title">
+      <h2 id="flow-title">導入フロー</h2>
+      <p class="section-lead">各段階の確認が済んだら次へ進みます。失敗や不明点があれば、実データを移さず、その段階で止めて原因を直します。</p>
+      <ol class="flow">
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>社内の利用条件を確認する</h3><span class="tag">最初の相談</span></div>
+            <ul>
+              <li>Azureサブスクリプション、作成権限、担当管理者、利用リージョンを確認する。</li>
+              <li>費用・プラン・上限・社内のデータ保存ルールを、作成前に最新情報で確認する。</li>
+              <li>利用するメンバーと上司役のメールアドレス、試験開始の範囲を決める。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>環境を作る担当者と、許可された使い方が決まっている。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>アプリをAzureで動かせる形に整える</h3><span class="tag">コードと設定</span></div>
+            <ul>
+              <li>ローカル専用のホスト名チェックを、許可したAzureのURLも使える設定にする。</li>
+              <li>3秒ごとのデータ更新確認は、Azureでは停止または間隔を延ばす。</li>
+              <li>App Serviceの起動方法・ポートと、SQLiteを置く永続領域を実環境で確かめる。</li>
+              <li>Azureでは <code>TODO_AUTH_MODE=entra</code> を使い、開発用のユーザー切替は使わない。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>設定値がコードに埋め込まれず、ローカル動作と既存テストを保てている。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>上司画面を作り、権限を確認する</h3><span class="tag">チーム機能</span></div>
+            <ul>
+              <li>上司だけが、長時間・期限超過・相談中と理由を閲覧できる画面を作る。</li>
+              <li>上司画面も閲覧専用にし、タスクの編集は本人だけにする。</li>
+              <li>上司以外が画面URLや操作先へ直接アクセスしても拒否されることを確認する。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>本人・上司それぞれの見える範囲がテストで確認できている。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>本番データを入れない検証環境を作る</h3><span class="tag">Azure準備</span></div>
+            <ul>
+              <li>アプリ専用のリソースグループとLinux App Serviceプラン・App Serviceを用意する。</li>
+              <li>Pythonの版、プラン、起動コマンド、HTTPS、永続ストレージを設定する。</li>
+              <li>まずは空のDBまたはテスト用DBで確認する。料金・無料枠・バックアップ可否は現在のAzure情報で再確認する。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>再起動後もテストデータが残り、費用と利用上限が把握できている。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>Entra IDログインと許可リストを設定する</h3><span class="tag">入口の保護</span></div>
+            <ul>
+              <li>App ServiceのEasy AuthでMicrosoft Entra IDを有効にし、未ログイン利用を拒否する。</li>
+              <li><code>TODO_ALLOWED_USER_EMAILS</code>、<code>TODO_MANAGER_EMAILS</code>、<code>TODO_DATA_OWNER_EMAIL</code>を設定する。上司と既存データの持ち主も許可リストに含める。</li>
+              <li>Easy Authが渡すメール情報を実際のリクエストで確かめ、許可外メールと未ログインを拒否する。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>許可した人だけが入れ、ユーザー名が正しいデータ所有者に結び付く。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>アプリを手動で配置して、空データで動かす</h3><span class="tag">初回公開</span></div>
+            <ul>
+              <li>最初はGitHubからの自動公開を設定せず、手動で配置する。</li>
+              <li>タスク、WBS、日報、アーカイブ、静的ファイル、ログインとログアウトを一通り確認する。</li>
+              <li>再起動・再配置をして、DBが残ることとエラーが記録されることを確かめる。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>空データの検証環境で主要画面と操作が使える。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>2人以上で、見えない・変えられないことを確認する</h3><span class="tag">受け入れ確認</span></div>
+            <ul>
+              <li>メンバーA・Bでログインし、タスク・日報・記録が互いに見えないことを確認する。</li>
+              <li>別の人のタスクIDを直接指定した操作も拒否されることを確認する。</li>
+              <li>上司は必要な一覧を閲覧でき、メンバーは上司画面を開けないことを確認する。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>画面表示だけでなく、直接URLや送信操作でも権限が守られている。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>バックアップ・復元と運用担当を決める</h3><span class="tag">守りの準備</span></div>
+            <ul>
+              <li>DBをどこへ・どの頻度でコピーし、誰が確認するか決める。</li>
+              <li>バックアップから別の場所へ復元し、実際に読めることを試す。</li>
+              <li>SQLiteのため、まずはApp Serviceを1台で運用する。複数台への拡張は同時利用とDBの方式を見直してから判断する。</li>
+              <li>利用量・エラーの確認方法と、停止時に連絡する担当者を決める。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>障害時に復旧できることを実演でき、担当者と手順が決まっている。</p>
+          </article>
+        </li>
+        <li class="flow-step">
+          <article class="step-card">
+            <div class="step-heading"><h3>実データをコピーで検証してから、少人数で試す</h3><span class="tag">本番データ移行</span></div>
+            <ul>
+              <li>元の <code>data/todo.db</code> は直接上書き・移動せず、バックアップを保管する。</li>
+              <li>コピーDBで所有者の結び付け、タスク数・日報・親子関係・記録を確認する。</li>
+              <li>確認が終わり、データ移行の許可と戻し方が決まってから、本番用の安全な移行手順を実施する。</li>
+              <li>まず少人数で試し、問題がなければ対象者を広げる。</li>
+            </ul>
+            <p><strong>次へ進む目印:</strong>持ち主とデータが正しく、利用者が実業務で一通り使える。</p>
+          </article>
+        </li>
+      </ol>
+      <div class="gate">全段階の確認がそろった？<span>いいえ → 実データを入れず、該当段階へ戻って解決する</span></div>
+      <p class="branch-note"><strong>はい:</strong>利用者へ開始を案内し、バックアップ・ログイン・利用量を定期的に確認する運用へ。</p>
+    </section>
+
+    <section id="complete" class="done-card" aria-labelledby="complete-title">
+      <h2 id="complete-title">「Azure導入完了」と言える目印</h2>
+      <ul>
+        <li>AzureのHTTPSアドレスから、アプリが再起動後も安定して開く。</li>
+        <li>Microsoft Entra IDで本人を確認し、許可された人だけが利用できる。</li>
+        <li>メンバー同士のデータが分かれ、上司画面は上司だけが閲覧できる。</li>
+        <li>既存データの持ち主と記録が正しく引き継がれ、別ユーザーへ混ざっていない。</li>
+        <li>DBの保存場所が永続領域で、バックアップからの復元を実際に確認できている。</li>
+        <li>費用・利用上限・運用担当・障害時の戻し方が関係者に共有されている。</li>
+      </ul>
+    </section>
+
+    <section class="caution-card" aria-labelledby="caution-title">
+      <h2 id="caution-title">実データを守るための注意</h2>
+      <ul>
+        <li><code>data/todo.db</code> は本物の記録。試験・移行確認には必ずコピーを使う。</li>
+        <li>開発用ユーザー選択はパスワードなしのローカル試用。本番Azureでは有効にしない。</li>
+        <li>無料プランの有無・上限や、永続保存・バックアップの仕様は変わる可能性がある。作成当日にAzureの最新情報と社内ルールを確認する。</li>
+        <li>Azure公開や実データ移行は、権限・費用・データ保存の承認がそろうまで実施しない。</li>
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <p>この資料は、現在の実装状況とリポジトリ内の計画をもとにした進め方です。Azureの設定値・プラン・保存仕様は、実施前に最新のMicrosoft公式情報と社内ルールで確認してください。</p>
+      <p>関連資料: <a href="次の作業.md">次の作業</a> ・ <a href="設計方針.md">設計方針</a></p>
+      <p>更新日: 2026年11月13日</p>
+    </footer>
+  </main>
+</body>
+</html>
