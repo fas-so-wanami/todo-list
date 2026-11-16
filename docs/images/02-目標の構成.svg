@@ -22,7 +22,7 @@
   <!-- 見出し -->
   <text x="40" y="52" font-size="26" font-weight="700" fill="#1e2433">目標の構成</text>
   <rect x="180" y="30" width="138" height="28" rx="14" fill="#e8edf8" stroke="#2b4a9b"/>
-  <text x="249" y="50" font-size="14" font-weight="700" fill="#2b4a9b" text-anchor="middle">段階 ②〜④ 未着手</text>
+  <text x="249" y="50" font-size="14" font-weight="700" fill="#2b4a9b" text-anchor="middle">Azure公開前</text>
   <text x="40" y="84" font-size="16" fill="#4a5266">チームで1つのサーバーを使います。各PCにはデータを置かず、ブラウザで開くだけです。</text>
 
   <!-- 社員 -->
@@ -57,7 +57,7 @@
   <text x="397" y="300" font-size="12" fill="#dbe3f6" text-anchor="middle">いまのアプリを</text>
   <text x="397" y="318" font-size="12" fill="#dbe3f6" text-anchor="middle">そのまま載せる</text>
   <text x="397" y="350" font-size="12" fill="#dbe3f6" text-anchor="middle">+ 上司画面</text>
-  <text x="397" y="368" font-size="12" fill="#dbe3f6" text-anchor="middle">(段階③で作る)</text>
+  <text x="397" y="368" font-size="12" fill="#dbe3f6" text-anchor="middle">(段階③で試作済み)</text>
 
   <g transform="translate(500 246)">
     <ellipse cx="60" cy="14" rx="60" ry="14" fill="#ffe377" stroke="#e7c443" stroke-width="1.5"/>

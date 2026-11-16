@@ -9,29 +9,28 @@
   <rect width="960" height="400" fill="url(#grid)"/>
 
   <text x="40" y="52" font-size="26" font-weight="700" fill="#1e2433">ロードマップ</text>
-  <text x="40" y="84" font-size="16" fill="#4a5266">引き継ぎの時点で、段階①(個人で使って磨く)まで完了しています。</text>
+  <text x="40" y="84" font-size="16" fill="#4a5266">段階②・③のローカル試作まで完了。次は段階④のAzure公開です。</text>
 
   <!-- 線 -->
   <line x1="120" y1="168" x2="840" y2="168" stroke="#cfd5df" stroke-width="4"/>
-  <line x1="120" y1="168" x2="300" y2="168" stroke="#2b4a9b" stroke-width="4"/>
+  <line x1="120" y1="168" x2="480" y2="168" stroke="#2b4a9b" stroke-width="4"/>
 
   <!-- ① 完了 -->
   <circle cx="120" cy="168" r="30" fill="#f4f6f9" stroke="#cf3a28" stroke-width="3"/>
   <text x="120" y="177" font-size="24" font-weight="700" fill="#cf3a28" text-anchor="middle" font-family="'BIZ UDPMincho','Yu Mincho',serif" transform="rotate(-8 120 168)">済</text>
-  <rect x="78" y="112" width="84" height="22" rx="11" fill="#2b4a9b"/>
-  <text x="120" y="128" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">いまここ</text>
-
-  <!-- ②〜④ 未着手 -->
+  <!-- ②・③ ローカル試作済み、④ 次に進む -->
   <g>
-    <circle cx="300" cy="168" r="26" fill="#ffffff" stroke="#2b4a9b" stroke-width="2.5" stroke-dasharray="5 4"/>
+    <circle cx="300" cy="168" r="26" fill="#e8edf8" stroke="#2b4a9b" stroke-width="2.5"/>
     <text x="300" y="176" font-size="22" font-weight="700" fill="#2b4a9b" text-anchor="middle">②</text>
-    <circle cx="480" cy="168" r="26" fill="#ffffff" stroke="#9aa2b2" stroke-width="2.5" stroke-dasharray="5 4"/>
-    <text x="480" y="176" font-size="22" font-weight="700" fill="#646b7a" text-anchor="middle">③</text>
-    <circle cx="660" cy="168" r="26" fill="#ffffff" stroke="#9aa2b2" stroke-width="2.5" stroke-dasharray="5 4"/>
-    <text x="660" y="176" font-size="22" font-weight="700" fill="#646b7a" text-anchor="middle">④</text>
+    <circle cx="480" cy="168" r="26" fill="#e8edf8" stroke="#2b4a9b" stroke-width="2.5"/>
+    <text x="480" y="176" font-size="22" font-weight="700" fill="#2b4a9b" text-anchor="middle">③</text>
+    <circle cx="660" cy="168" r="26" fill="#ffffff" stroke="#2b4a9b" stroke-width="2.5" stroke-dasharray="5 4"/>
+    <text x="660" y="176" font-size="22" font-weight="700" fill="#2b4a9b" text-anchor="middle">④</text>
     <circle cx="840" cy="168" r="26" fill="#e9ebf0" stroke="#9aa2b2" stroke-width="2"/>
     <text x="840" y="176" font-size="22" font-weight="700" fill="#9aa2b2" text-anchor="middle">⑤</text>
   </g>
+  <rect x="618" y="112" width="84" height="22" rx="11" fill="#2b4a9b"/>
+  <text x="660" y="128" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">次はここ</text>
 
   <!-- 説明 -->
   <g font-size="13" fill="#1e2433" text-anchor="middle">
@@ -44,14 +43,14 @@
     <text x="300" y="226" font-size="15" font-weight="700">複数ユーザー化</text>
     <text x="300" y="248" fill="#4a5266">ログインで本人を判別</text>
     <text x="300" y="266" fill="#4a5266">自分のタスクだけ見える</text>
-    <rect x="266" y="282" width="68" height="22" rx="11" fill="#e8edf8"/>
-    <text x="300" y="298" font-size="12" font-weight="700" fill="#2b4a9b">次はここ</text>
+    <rect x="260" y="282" width="80" height="22" rx="11" fill="#e8edf8"/>
+    <text x="300" y="298" font-size="12" font-weight="700" fill="#2b4a9b">コード試作済</text>
 
     <text x="480" y="226" font-size="15" font-weight="700">上司画面</text>
-    <text x="480" y="248" fill="#4a5266">長時間・期限超過・</text>
-    <text x="480" y="266" fill="#4a5266">相談中を一覧する</text>
-    <rect x="446" y="282" width="68" height="22" rx="11" fill="#eef0f4"/>
-    <text x="480" y="298" font-size="12" fill="#4a5266">未着手</text>
+    <text x="480" y="248" fill="#4a5266">例外タスク・提出済み</text>
+    <text x="480" y="266" fill="#4a5266">日報を確認する</text>
+    <rect x="440" y="282" width="80" height="22" rx="11" fill="#e8edf8"/>
+    <text x="480" y="298" font-size="12" font-weight="700" fill="#2b4a9b">画面試作済</text>
 
     <text x="660" y="226" font-size="15" font-weight="700">Azure に公開</text>
     <text x="660" y="248" fill="#4a5266">App Service に手動で</text>
@@ -66,6 +65,6 @@
     <text x="840" y="298" font-size="12" fill="#4a5266">一時停止中</text>
   </g>
 
-  <text x="40" y="360" font-size="13" fill="#4a5266">②〜④ は順に進めます。⑤ はコードを残してあり、必要になったら再開します。</text>
-  <text x="40" y="382" font-size="13" fill="#4a5266">Git 管理は環境が整ってから始めます(今はフォルダのまま)。</text>
+  <text x="40" y="360" font-size="13" fill="#4a5266">②・③はローカル試作済み。Azure設定・公開とチーム試用は段階④で進めます。</text>
+  <text x="40" y="382" font-size="13" fill="#4a5266">ソースコードはGitHubで管理し、変更はPull Requestで確認します。⑤は一時停止中です。</text>
 </svg>
