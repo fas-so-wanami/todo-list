@@ -40,7 +40,13 @@
         <a href="/" class="{{ 'active' if view == 'board' }}" {{ 'aria-current=page' if view == 'board' }}>タスク</a>
         <a href="/wbs" class="{{ 'active' if view == 'wbs' }}" {{ 'aria-current=page' if view == 'wbs' }}>WBS</a>
         <a href="/report" class="{{ 'active' if view == 'report' }}" {{ 'aria-current=page' if view == 'report' }}>日報</a>
+        {% if is_manager %}
+        <a href="/report-review" class="{{ 'active' if view == 'report_review' }}" {{ 'aria-current=page' if view == 'report_review' }}>日報確認</a>
+        {% endif %}
         <a href="/archive" class="{{ 'active' if view == 'archive' }}" {{ 'aria-current=page' if view == 'archive' }}>アーカイブ</a>
+        {% if is_manager %}
+        <a href="/team" class="{{ 'active' if view == 'team' }}" {{ 'aria-current=page' if view == 'team' }}>メンバー状況</a>
+        {% endif %}
       </nav>
       <div class="header-tools">
         <button type="button" class="header-btn completion-effect-toggle" data-completion-effects-toggle aria-pressed="true">
@@ -331,17 +337,20 @@
         } catch (error) { /* サーバー停止中は何もしない(操作時に通知が出る) */ }
       }
       // 自分の操作による変更では更新しないよう、操作のたびに基準値を取り直す。
-      document.body.addEventListener("htmx:afterRequest", rememberCurrentDataVersion);
-      rememberCurrentDataVersion();
-      let refreshTimer = window.setInterval(refreshIfChangedElsewhere, 3000);
-      window.addEventListener("todo-view-paused", function (event) {
-        viewPaused = event.detail;
-        window.clearInterval(refreshTimer);
-        if (!viewPaused) {
-          refreshTimer = window.setInterval(refreshIfChangedElsewhere, 3000);
-          refreshIfChangedElsewhere();
-        }
-      });
+      const refreshContent = document.getElementById("main-content");
+      if (refreshContent && refreshContent.dataset.refreshUrl) {
+        document.body.addEventListener("htmx:afterRequest", rememberCurrentDataVersion);
+        rememberCurrentDataVersion();
+        let refreshTimer = window.setInterval(refreshIfChangedElsewhere, 3000);
+        window.addEventListener("todo-view-paused", function (event) {
+          viewPaused = event.detail;
+          window.clearInterval(refreshTimer);
+          if (!viewPaused) {
+            refreshTimer = window.setInterval(refreshIfChangedElsewhere, 3000);
+            refreshIfChangedElsewhere();
+          }
+        });
+      }
     })();
   </script>
   <script src="/static/task-visibility.js?v={{ APP_VERSION }}"></script>
