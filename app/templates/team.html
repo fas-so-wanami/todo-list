@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}メンバー状況 - ToDo{% endblock %}
+{% block content %}
+<section id="main-content" class="team-page" aria-labelledby="team-title">
+  <div class="team-heading">
+    <div>
+      <h1 id="team-title">メンバー状況</h1>
+      <p>支援が必要なタスクを確認します</p>
+    </div>
+    <p class="team-updated">最終更新: <time datetime="{{ updated_at }}">{{ updated_at[:10] }} {{ updated_at[11:16] }}</time></p>
+  </div>
+
+  <form class="team-filter-form" method="get" action="/team">
+    <input type="hidden" name="filters" value="1">
+    <fieldset class="team-filter-options">
+      <legend>表示する種類</legend>
+      {% for alert_type in alert_types %}
+      <label class="team-filter-option {{ 'selected' if alert_type in selected_types }}">
+        <input type="checkbox" name="type" value="{{ alert_type }}" {{ 'checked' if alert_type in selected_types }}>
+        {{ alert_labels[alert_type] }}
+      </label>
+      {% endfor %}
+      <button type="submit" class="primary">更新</button>
+      <a class="team-reset-filters" href="/team">すべて表示</a>
+    </fieldset>
+  </form>
+
+  {% if filters_empty %}
+  <p class="team-filter-notice" role="status">表示する種類を1つ以上選んでください。</p>
+  {% endif %}
+
+  {% if members %}
+  <div class="team-members">
+    {% for member in members %}
+    <section class="team-member" aria-labelledby="team-member-{{ loop.index }}">
+      <div class="team-member-heading">
+        <h2 id="team-member-{{ loop.index }}">{{ member.name }}</h2>
+      </div>
+      {% if member.tasks %}
+      <div class="team-table-scroll">
+        <table class="team-table">
+          <thead>
+            <tr>
+              <th scope="col">タスク</th>
+              <th scope="col">該当</th>
+              <th scope="col">累計作業時間</th>
+              <th scope="col">期限</th>
+              <th scope="col">相談理由</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in member.tasks %}
+            <tr data-team-task-id="{{ task.id }}">
+              <th scope="row">{{ task.title }}</th>
+              <td class="team-alerts">
+                {% for alert_type in task.alert_types %}
+                <span class="team-alert team-alert-{{ alert_type }}">{{ alert_labels[alert_type] }}</span>
+                {% endfor %}
+              </td>
+              <td>{{ task.total_minutes|duration if 'long_running' in task.alert_types }}</td>
+              <td>{{ task.due_date if 'overdue' in task.alert_types }}</td>
+              <td>
+                {% if 'blocker' in task.alert_types %}
+                  {{ task.blocker_note or '理由は未記入' }}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="team-empty">{{ member.empty_message }}</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="team-empty">現在、表示対象の例外タスクはありません。</p>
+  {% endif %}
+</section>
+<script>
+  window.addEventListener("pageshow", function (event) {
+    const navigation = performance.getEntriesByType("navigation")[0];
+    if ((event.persisted || navigation?.type === "back_forward") && location.search) {
+      location.replace("/team");
+    }
+  });
+</script>
+{% endblock %}

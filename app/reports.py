@@ -228,29 +228,45 @@ def save_draft(
 def submit(db: sqlite3.Connection, user_id: int, report_date: date) -> None:
     report = get_or_create_report(db, user_id, report_date)
     now = clock.now_iso()
-    _replace_submission_snapshot(db, report, now)
+    _replace_submission_snapshot(
+        db, report, now,
+        time_tracking_enabled=bool(report["time_tracking_enabled"]),
+        details_enabled=bool(report["details_enabled"]),
+    )
     db.execute(
         "UPDATE daily_reports SET submitted_at = ?, updated_at = ?, has_unsubmitted_changes = 0 WHERE id = ?",
         (now, now, report["id"]),
     )
 
 
-def _replace_submission_snapshot(db: sqlite3.Connection, report: sqlite3.Row, submitted_at: str) -> None:
+def _replace_submission_snapshot(
+    db: sqlite3.Connection,
+    report: sqlite3.Row,
+    submitted_at: str,
+    *,
+    time_tracking_enabled: bool | None = None,
+    details_enabled: bool | None = None,
+) -> None:
     """提出時点の入力内容を別保存し、修正中の下書きに影響されないようにする。"""
     db.execute(
         """INSERT INTO daily_report_snapshots
-           (report_id, user_id, report_date, work_style, leave_types, comment, submitted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+           (report_id, user_id, report_date, work_style, leave_types, comment, submitted_at,
+            time_tracking_enabled, details_enabled)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(report_id) DO UPDATE SET
                user_id = excluded.user_id,
                report_date = excluded.report_date,
                work_style = excluded.work_style,
                leave_types = excluded.leave_types,
                comment = excluded.comment,
-               submitted_at = excluded.submitted_at""",
+               submitted_at = excluded.submitted_at,
+               time_tracking_enabled = excluded.time_tracking_enabled,
+               details_enabled = excluded.details_enabled""",
         (
             report["id"], report["user_id"], report["report_date"], report["work_style"],
             report["leave_types"], report["comment"], submitted_at,
+            int(time_tracking_enabled) if time_tracking_enabled is not None else None,
+            int(details_enabled) if details_enabled is not None else None,
         ),
     )
     db.execute(

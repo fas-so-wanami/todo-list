@@ -6,17 +6,17 @@ from collections.abc import Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, TypeAlias
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlencode, urlparse
 
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import auth, blockers, clock, daily, db as database, projects, reports, tasks, wbs
+from app import auth, blockers, clock, daily, db as database, projects, report_review, reports, tasks, team, wbs
 from app.version import compute_app_version
 from app.ai import actions as ai_actions
 
@@ -261,6 +261,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             "today_iso": clock.today().isoformat(),
             "current_user_name": getattr(request.state, "user_name", database.DEFAULT_USER_NAME),
             "development_login_enabled": auth_settings.mode == "dev",
+            "is_manager": getattr(request.state, "is_manager", False),
         }
 
     def board_context(
@@ -392,6 +393,51 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return templates.TemplateResponse(request, "wbs.html", {
             **base_context(request, "wbs"),
             **view,
+        })
+
+    @app.get("/team", response_class=HTMLResponse)
+    def team_page(request: Request, db: Database):
+        """上司役に限り、許可対象メンバーの支援が必要なタスクを表示する。"""
+        if not request.state.is_manager:
+            raise HTTPException(status_code=403, detail="この画面を開く権限がありません。")
+
+        filter_applied = request.query_params.get("filters") == "1"
+        if filter_applied:
+            selected_types = {
+                value for value in request.query_params.getlist("type")
+                if value in team.ALERT_TYPES
+            }
+        else:
+            selected_types = set(team.ALERT_TYPES)
+        members = team.build_dashboard(db, auth_settings, selected_types)
+        return templates.TemplateResponse(request, "team.html", {
+            **base_context(request, "team"),
+            "members": members,
+            "alert_types": team.ALERT_TYPES,
+            "alert_labels": team.ALERT_LABELS,
+            "selected_types": selected_types,
+            "filters_empty": filter_applied and not selected_types,
+            "updated_at": clock.now_iso(),
+        })
+
+    @app.get("/report-review", response_class=HTMLResponse)
+    def report_review_page(request: Request, db: Database, date: str = ""):
+        """上司役に限り、選択日のメンバー全員の日報提出状況を表示する。"""
+        if not request.state.is_manager:
+            raise HTTPException(status_code=403, detail="この画面を開く権限がありません。")
+
+        report_date = parse_report_date(date) if date else clock.today()
+        return templates.TemplateResponse(request, "report_review.html", {
+            **base_context(request, "report_review"),
+            "members": report_review.build_review_view(db, auth_settings, report_date),
+            "report_date": report_date,
+            "report_date_iso": report_date.isoformat(),
+            "report_date_label": format_long_date(report_date),
+            "today_iso": clock.today().isoformat(),
+            "previous_date": (report_date - timedelta(days=1)).isoformat(),
+            "next_date": (report_date + timedelta(days=1)).isoformat(),
+            "has_next_date": report_date < clock.today(),
+            "updated_at": clock.now_iso(),
         })
 
     # ---- 日報 ----

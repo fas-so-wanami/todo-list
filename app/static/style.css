@@ -815,6 +815,95 @@ p.empty { margin: 0; border: 1px dashed var(--rule-strong); border-radius: var(-
 .chip.filter.on { background: var(--navy); border-color: var(--navy); color: var(--on-accent); }
 .spacer { flex: 1; }
 
+/* ---------- 上司向け: メンバー状況 ---------- */
+.team-page { max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; }
+.team-heading, .team-member-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.team-heading { margin-bottom: 18px; }
+.team-heading h1 { margin: 0; font-size: 22px; }
+.team-heading p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.team-heading .team-updated { margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.team-filter-form { margin-bottom: 20px; }
+.team-filter-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; }
+.team-filter-options legend { width: 100%; margin-bottom: 6px; color: var(--ink-2); font-size: 12px; }
+.team-filter-option {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius); color: var(--ink-2);
+  font-size: 13px; cursor: pointer;
+}
+.team-filter-option.selected { border-color: var(--navy); color: var(--navy); background: var(--navy-soft); }
+.team-filter-option input { margin: 0; accent-color: var(--navy); }
+.team-reset-filters { padding: 7px 4px; color: var(--navy); font-size: 13px; }
+.team-filter-notice { margin: 0 0 16px; color: var(--danger-ink); font-size: 13px; }
+.team-member + .team-member { margin-top: 24px; }
+.team-member-heading { justify-content: flex-start; margin-bottom: 8px; border-bottom: 1px solid var(--rule-strong); }
+.team-member-heading h2 { margin: 0; padding: 0 0 6px; font-size: 17px; }
+.team-table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--sheet); }
+.team-table { width: 100%; min-width: 760px; border-collapse: collapse; }
+.team-table th, .team-table td { padding: 8px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.team-table thead th { background: var(--sheet-2); color: var(--ink-2); font-size: 12px; font-weight: 700; }
+.team-table tbody th { font-size: 13px; font-weight: 600; }
+.team-table td { font-size: 13px; overflow-wrap: anywhere; }
+.team-table tr:last-child > * { border-bottom: 0; }
+.team-alerts { white-space: nowrap; }
+.team-alert { display: inline-block; margin: 0 4px 3px 0; padding: 2px 6px; border-radius: 2px; font-size: 11px; }
+.team-alert-long_running { background: var(--marker); color: var(--marker-ink); }
+.team-alert-overdue { color: var(--shu); font-weight: 700; }
+.team-alert-blocker { background: var(--fusen); color: var(--fusen-ink); }
+.team-empty { margin: 0; padding: 12px; border: 1px dashed var(--rule-strong); color: var(--ink-2); font-size: 13px; }
+
+/* ---------- 上司向け: 日報確認 ---------- */
+.report-review-page { max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; }
+.report-review-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.report-review-heading h1 { margin: 0; font-size: 22px; }
+.report-review-heading p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.report-review-updated { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.report-review-date-form { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.report-review-date-form label { color: var(--ink-2); font-size: 13px; }
+.report-review-date-form input { width: 150px; font-variant-numeric: tabular-nums; }
+.report-review-day-link, .report-review-day-disabled { color: var(--navy); font-size: 13px; text-decoration: none; }
+.report-review-day-link:hover { text-decoration: underline; }
+.report-review-day-disabled { color: var(--muted); }
+.report-review-member { margin-bottom: 8px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--sheet); }
+.report-review-summary {
+  display: flex; align-items: center; gap: 12px; padding: 11px 14px; cursor: pointer;
+  list-style: none; transition: background-color 0.15s;
+}
+.report-review-summary::-webkit-details-marker { display: none; }
+.report-review-summary:hover { background: var(--hover); }
+.report-review-summary::after {
+  content: ""; width: 7px; height: 7px; margin-left: auto;
+  border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2);
+  transform: rotate(45deg); transition: transform 0.2s;
+}
+.report-review-member[open] > .report-review-summary::after { transform: rotate(225deg); }
+.report-review-member[open] > .report-review-body { animation: report-review-open 0.2s var(--ease-out) both; }
+@keyframes report-review-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.report-review-name { min-width: 180px; font-size: 14px; font-weight: 700; }
+.report-review-submitted-at { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.status-badge.s-unsubmitted { background: var(--hover); color: var(--ink-2); }
+.report-review-body { padding: 0 16px 16px; border-top: 1px solid var(--rule); }
+.report-review-section { margin-top: 14px; }
+.report-review-section h2 { margin: 0 0 7px; font-size: 14px; }
+.report-review-table-scroll { overflow-x: auto; }
+.report-review-table { width: 100%; border-collapse: collapse; }
+.report-review-table th, .report-review-table td { padding: 7px 8px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.report-review-table thead th { color: var(--muted); font-size: 12px; font-weight: 400; }
+.report-review-table tbody th { font-size: 13px; font-weight: 600; }
+.report-review-table td { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+.report-review-parent { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+.report-review-totals { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 12px 0 0; }
+.report-review-totals dt { color: var(--muted); font-size: 11px; }
+.report-review-totals dd { margin: 0; color: var(--ink); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.report-review-details dl { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0; }
+.report-review-details dl div { display: flex; gap: 8px; }
+.report-review-details dt { color: var(--muted); font-size: 12px; }
+.report-review-details dd { margin: 0; color: var(--ink); font-size: 13px; }
+.report-review-comment { margin: 0; padding: 10px 12px; border-left: 3px solid var(--rule-strong); background: var(--sheet-2); color: var(--ink); font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-review-empty { margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--rule-strong); color: var(--ink-2); font-size: 13px; }
+
 /* ---------- タスク画面 ---------- */
 
 .board-section .section-head { align-items: center; margin-bottom: 12px; min-height: 36px; }

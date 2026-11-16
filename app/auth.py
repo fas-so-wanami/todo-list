@@ -49,6 +49,14 @@ def development_user_specs(settings: AuthSettings) -> tuple[tuple[str, str], ...
     return ((owner_email, owner_name), *DEVELOPMENT_USERS)
 
 
+def allowed_member_emails(settings: AuthSettings) -> list[str]:
+    """上司役を除く利用許可メールを返し、未ログイン者も一覧に含められるようにする。"""
+    emails = set(settings.allowed_emails)
+    if settings.mode == "dev":
+        emails.update(email for email, _ in development_user_specs(settings))
+    return sorted(emails - settings.manager_emails)
+
+
 def load_settings() -> AuthSettings:
     """起動モードに応じて設定を検証し、危険な認証抜けを防ぐ。"""
     mode = os.getenv("TODO_AUTH_MODE", "local").strip().lower()

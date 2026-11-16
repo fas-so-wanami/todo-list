@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}日報確認 - ToDo{% endblock %}
+{% block content %}
+<section id="main-content" class="report-review-page" aria-labelledby="report-review-title">
+  <div class="report-review-heading">
+    <div>
+      <h1 id="report-review-title">日報確認</h1>
+      <p>{{ report_date_label }}の提出状況</p>
+    </div>
+    <p class="report-review-updated">最終更新: <time datetime="{{ updated_at }}">{{ updated_at[11:16] }}</time></p>
+  </div>
+
+  <form class="report-review-date-form" method="get" action="/report-review">
+    <a class="report-review-day-link" href="/report-review?date={{ previous_date }}">← 前日</a>
+    <label for="report-review-date">確認する日</label>
+    <input id="report-review-date" type="date" name="date" value="{{ report_date_iso }}" max="{{ today_iso }}">
+    <button class="primary" type="submit">表示・更新</button>
+    {% if has_next_date %}
+    <a class="report-review-day-link" href="/report-review?date={{ next_date }}">翌日 →</a>
+    {% else %}
+    <span class="report-review-day-disabled" aria-disabled="true">翌日 →</span>
+    {% endif %}
+  </form>
+
+  {% if members %}
+  <div class="report-review-members">
+    {% for member in members %}
+    <details class="report-review-member">
+      <summary class="report-review-summary">
+        <span class="report-review-name">{{ member.name }}</span>
+        <span class="status-badge s-{{ member.status }}">{{ member.status_label }}</span>
+        {% if member.submitted_at %}
+        <time class="report-review-submitted-at" datetime="{{ member.submitted_at }}">提出 {{ member.submitted_at[11:16] }}</time>
+        {% endif %}
+      </summary>
+      <div class="report-review-body">
+        {% if member.has_submission_content %}
+          <section class="report-review-section">
+            <h2>作業したタスク</h2>
+            {% if member.task_items %}
+            <div class="report-review-table-scroll">
+              <table class="report-review-table">
+                <thead>
+                  <tr>
+                    <th scope="col">タスク</th>
+                    {% if member.time_tracking_enabled %}<th scope="col">作業時間</th>{% endif %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for task in member.task_items %}
+                  <tr>
+                    <th scope="row">
+                      {% if task.parent_title %}<span class="report-review-parent">{{ task.parent_title }} ›</span>{% endif %}
+                      {{ task.task_title }}
+                    </th>
+                    {% if member.time_tracking_enabled %}<td>{{ task.minutes|hhmm if task.minutes else '' }}</td>{% endif %}
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p class="report-review-empty">作業したタスクはありません。</p>
+            {% endif %}
+          </section>
+
+          {% if member.time_tracking_enabled %}
+          <dl class="report-review-totals">
+            <div><dt>作業時間合計</dt><dd>{{ member.total_minutes|hhmm }}</dd></div>
+            <div><dt>基本勤務時間</dt><dd>{{ member.base_minutes|hhmm }}</dd></div>
+            <div><dt>差</dt><dd>{{ member.overtime_minutes|hhmm(true) }}</dd></div>
+          </dl>
+          {% endif %}
+
+          {% if member.details_enabled %}
+          <section class="report-review-section report-review-details">
+            <h2>勤務形態・休暇など</h2>
+            <dl>
+              <div><dt>勤務形態</dt><dd>{{ member.work_style_label }}</dd></div>
+              <div><dt>休暇など</dt><dd>{{ member.leave_types|join('・') if member.leave_types else 'なし' }}</dd></div>
+            </dl>
+          </section>
+          {% endif %}
+
+          <section class="report-review-section">
+            <h2>備考・所感</h2>
+            <p class="report-review-comment">{{ member.comment or '記載なし' }}</p>
+          </section>
+        {% elif member.status == 'unsubmitted' %}
+        <p class="report-review-empty">この日の日報は未提出です。</p>
+        {% else %}
+        <p class="report-review-empty">提出版の内容を確認できません。再提出後に表示できます。</p>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="report-review-empty">表示対象のメンバーがいません。利用許可リストを確認してください。</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -33,8 +33,8 @@
 ## 2. アプリの概要
 
 - 個人用 ToDo アプリ。将来はチームで使い、上司が「異常に時間がかかっている作業」と「困りごと」を察知できるようにする。Excel 日報の代わり。
-- 画面は 4 つ: **タスク**(今日やる / 明日以降にやる)、**WBS**(プロジェクトの予定確認)、**日報**、**アーカイブ**。
-- 現在は PC 1 台のローカルで動く(127.0.0.1:8765)。複数ユーザー化や Azure への公開は今後の段階で、**頼まれるまで着手しない**(設計方針 2 章)。
+- 画面は 6 つ: **タスク**(今日やる / 明日以降にやる)、**WBS**(プロジェクトの予定確認)、本人用の**日報**、上司用の**日報確認**、**アーカイブ**、上司専用の**メンバー状況**。
+- 現在は PC 1 台のローカルで動く(127.0.0.1:8765)。複数ユーザー認証と上司向け2画面はローカル試作済みで、Azure への公開は未着手。頼まれるまで公開作業はしない。
   頼まれたら [docs/次の作業.md](docs/次の作業.md) の手順と目印に沿って進める。
 - 技術: Python 3.11 / FastAPI / Jinja2 / htmx / SQLite。ビルド工程なし。
 
@@ -46,6 +46,8 @@
 | `app/tasks.py` | タスク | 作成・更新・進捗・繰り返し・タグ・待ち・一覧用の付随情報(`enrich`)・親子の並べ替え |
 | `app/projects.py` | プロジェクト | プロジェクトの作成・名前変更・終了/再開。タスクとの関連付けは `tasks.py` |
 | `app/wbs.py` | WBS | プロジェクトのタスクと予定期間・信号を組み立てる。保存処理はしない |
+| `app/team.py` | メンバー状況 | 例外タスクがある許可対象メンバーと、長時間化/期限超過/相談中の一覧を作る |
+| `app/report_review.py` | 日報確認 | 上司向けの提出状況と提出版だけを組み立てる。下書き本文は読まない |
 | `app/auth.py` | 認証 | ローカル/開発/Entraのモード、メール許可リスト、開発ユーザーCookie、初回ユーザー登録 |
 | `app/daily.py` | 日々の振り分け | 今日やる/明日以降にやるの判定、前日からの持ち越し、アーカイブ、作業時間(`time_logs`) |
 | `app/reports.py` | 日報 | 時:分の変換、下書き保存、提出、状態(下書き/提出済み/修正あり)、集計 |
@@ -58,7 +60,7 @@
 | `app/static/window-views.js` | 表示の引き継ぎ | 小窓の再利用・準備確認・元画面の閉鎖と拒否時の休止・復帰・未保存入力の確認 |
 | `app/static/task-visibility.js` | 子タスクの収納 | 親ごとの3通りの表示・収納数と注意件数・通常とミニ別の選択記憶。保存エラーの編集欄は隠さない |
 | `app/launcher.py` | 起動 | `start.bat` から呼ばれる。ポート確認、サーバー起動、ブラウザを開く |
-| `app/templates/` | 画面 | `board.html`/`_board_content.html`(タスク)、`wbs.html`(WBS)、`report.html`/`_report_content.html`/`_report_summary.html`(日報)、`archive.html`、共通部品は `_macros.html` |
+| `app/templates/` | 画面 | `board.html`/`_board_content.html`(タスク)、`wbs.html`(WBS)、`team.html`(上司専用メンバー状況)、`report_review.html`(上司専用日報確認)、`report.html`/`_report_content.html`/`_report_summary.html`(本人用日報)、`archive.html`、共通部品は `_macros.html` |
 | `app/static/style.css` | 見た目 | 色は `:root` の変数を使う |
 | `app/mcp_server.py`, `app/ai/` | Copilot Chat 連携 | **一時停止中**。頼まれない限り触らない・消さない。設定は `.vscode/mcp.json.disabled` に退避してある |
 | `tests/` | 自動テスト | 機能ごとに `test_*.py`。共通の準備は `conftest.py` |
@@ -69,6 +71,7 @@
   `base.html` の `<body>` に `hx-target="#main-content"` が付いているので、各ボタンはそれを引き継ぐ。
 - 日報の入力欄は、入力のたびに `/report/save` へ自動保存し、**集計欄(`#report-summary`)だけ** を差し替える。入力中の欄を差し替えると入力が消えるため。
 - 提出済み日報は、修正中の下書きと最新提出版を別に保存する。修正中に提出版を変更せず、再提出時だけ置き換える。提出版には作業名・親名・時間・勤務形態・休暇・備考を保存し、タスクの進捗・タグ・メモ・相談・返事待ちは含めない。
+- 上司専用の日報確認は提出版だけを読む。日付指定と手動更新ができ、下書き本文は取得・表示しない。提出版に入力欄のON/OFF状態を保存し、OFFまたは状態不明の内容は表示しない。
 - タスクを未着手から直接開始、または直接完了したときは、当日の日報候補に自動追加する。親の自動状態変更は対象外。手で外したタスクはその日は再追加せず、手動で選び直すと解除する(`daily_report_exclusions`)。
 - 日報の「作業時間」「勤務形態・休暇など」は独立したON/OFFを日報ごとに保存する(初期ON)。OFFでも値・タスクは消さない。切替前にフォームを保存し、読めない時刻があれば集計欄だけに案内して切替を止める。自動保存と切替は同じフォームで順に通信する。テレワークはチェックあり、出社はチェックなし。
 - 「作業時間」がOFFのときは集計欄の基本勤務時間・合計・差を表示しない。ONへ戻したら再表示する。提出状態と提出ボタンはOFFでも表示する。
@@ -81,7 +84,7 @@
 - 実データは `data/todo.db`(SQLite)。**この中身は利用者の本物のデータ**。
 - 主な表: `tasks`、`projects`(プロジェクト。今は個人PC内の分類)、`tags`/`task_tags`、`time_logs`(日ごとの作業時間)、`blockers`(困りごと)、`daily_plans`(今日やるに入れた記録)、
   `plan_rollovers`(前日からの持ち越しを 1 日 1 回にする記録)、`plan_deferrals`(自動で入るタスクをその日だけ「明日以降にやる」にした記録)、
-  `daily_reports`/`daily_report_items`(日報の下書き)、`daily_report_snapshots`/`daily_report_snapshot_items`(最新の提出版)、`daily_report_exclusions`(その日に日報から外した自動候補)、`users`(ログインメールと紐付け)。`daily_reflections` と `ai_reports` は旧機能・一時停止中の機能のもの。
+  `daily_reports`/`daily_report_items`(日報の下書き)、`daily_report_snapshots`/`daily_report_snapshot_items`(最新の提出版。入力欄のON/OFF状態も保持)、`daily_report_exclusions`(その日に日報から外した自動候補)、`users`(ログインメールと紐付け)。`daily_reflections` と `ai_reports` は旧機能・一時停止中の機能のもの。
 - 表を足すときは `SCHEMA` に `CREATE TABLE IF NOT EXISTS` で書く。
 - **既存の表に列を足すときは移行関数が必要**。`CREATE TABLE IF NOT EXISTS` は既存の表を変えないため。`_add_waiting_column_if_missing` を手本にし、`init_db` から呼ぶ。
 - 表や列の削除・名前変更はしない。必要なら利用者に相談する。

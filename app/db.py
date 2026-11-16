@@ -149,6 +149,8 @@ CREATE TABLE IF NOT EXISTS daily_report_snapshots (
     leave_types TEXT NOT NULL,
     comment TEXT NOT NULL,
     submitted_at TEXT NOT NULL,
+    time_tracking_enabled INTEGER CHECK (time_tracking_enabled IN (0, 1)),
+    details_enabled INTEGER CHECK (details_enabled IN (0, 1)),
     UNIQUE (user_id, report_date)
 );
 
@@ -271,6 +273,21 @@ def _add_report_toggle_columns_if_missing(connection: sqlite3.Connection) -> Non
         )
 
 
+def _add_report_snapshot_toggle_columns_if_missing(connection: sqlite3.Connection) -> None:
+    """提出版にも入力欄のON/OFFを残し、OFF項目を後から誤表示しない。"""
+    column_names = {row["name"] for row in connection.execute("PRAGMA table_info(daily_report_snapshots)")}
+    if "time_tracking_enabled" not in column_names:
+        connection.execute(
+            "ALTER TABLE daily_report_snapshots ADD COLUMN time_tracking_enabled INTEGER "
+            "CHECK (time_tracking_enabled IN (0, 1))"
+        )
+    if "details_enabled" not in column_names:
+        connection.execute(
+            "ALTER TABLE daily_report_snapshots ADD COLUMN details_enabled INTEGER "
+            "CHECK (details_enabled IN (0, 1))"
+        )
+
+
 def init_db(db_path: Path | str) -> None:
     if str(db_path) != ":memory:":
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -283,6 +300,7 @@ def init_db(db_path: Path | str) -> None:
         _add_start_date_column_if_missing(connection)
         _add_project_id_column_if_missing(connection)
         _add_report_toggle_columns_if_missing(connection)
+        _add_report_snapshot_toggle_columns_if_missing(connection)
         connection.execute(
             "INSERT OR IGNORE INTO users (id, name) VALUES (?, ?)",
             (DEFAULT_USER_ID, DEFAULT_USER_NAME),
