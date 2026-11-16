@@ -30,45 +30,49 @@
   {% block header %}
   <header class="app-header{% if development_login_enabled %} development-header{% endif %}">
     <div class="app-header-inner">
-      <a class="brand" href="/" aria-label="ToDo 今日の画面へ">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg>
-        </span>
-        <span class="brand-name">ToDo</span>
-      </a>
-      <nav class="nav" aria-label="画面切り替え">
-        <a href="/" class="{{ 'active' if view == 'board' }}" {{ 'aria-current=page' if view == 'board' }}>タスク</a>
-        <a href="/wbs" class="{{ 'active' if view == 'wbs' }}" {{ 'aria-current=page' if view == 'wbs' }}>WBS</a>
-        <a href="/report" class="{{ 'active' if view == 'report' }}" {{ 'aria-current=page' if view == 'report' }}>日報</a>
-        {% if is_manager %}
-        <a href="/report-review" class="{{ 'active' if view == 'report_review' }}" {{ 'aria-current=page' if view == 'report_review' }}>日報確認</a>
-        {% endif %}
-        <a href="/archive" class="{{ 'active' if view == 'archive' }}" {{ 'aria-current=page' if view == 'archive' }}>アーカイブ</a>
-        {% if is_manager %}
-        <a href="/team" class="{{ 'active' if view == 'team' }}" {{ 'aria-current=page' if view == 'team' }}>メンバー状況</a>
-        {% endif %}
-      </nav>
-      <div class="header-tools">
-        <button type="button" class="header-btn completion-effect-toggle" data-completion-effects-toggle aria-pressed="true">
-          完了演出 <span data-completion-effects-state>ON</span>
-        </button>
-        {# ブラウザが「アプリとしてインストール」できる状態のときだけ表示する #}
-        {% if SHOW_INSTALL_BUTTON %}<button type="button" class="header-btn" id="install-app" hidden>アプリとしてインストール</button>{% endif %}
-        <div class="theme-switch" role="group" aria-label="表示の明るさ">
-          <button type="button" data-theme-choice="auto" title="パソコンの設定に合わせる">自動</button>
-          <button type="button" data-theme-choice="light">ライト</button>
-          <button type="button" data-theme-choice="dark">ダーク</button>
+      <div class="header-navigation">
+        <a class="brand" href="/" aria-label="ToDo 今日の画面へ">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg>
+          </span>
+          <span class="brand-name">ToDo</span>
+        </a>
+        <nav class="nav" aria-label="画面切り替え">
+          <a href="/" class="{{ 'active' if view == 'board' }}" {{ 'aria-current=page' if view == 'board' }}>タスク</a>
+          <a href="/wbs" class="{{ 'active' if view == 'wbs' }}" {{ 'aria-current=page' if view == 'wbs' }}>WBS</a>
+          <a href="/report" class="{{ 'active' if view == 'report' }}" {{ 'aria-current=page' if view == 'report' }}>日報</a>
+          {% if is_manager %}
+          <a href="/report-review" class="{{ 'active' if view == 'report_review' }}" {{ 'aria-current=page' if view == 'report_review' }}>日報確認</a>
+          {% endif %}
+          <a href="/archive" class="{{ 'active' if view == 'archive' }}" {{ 'aria-current=page' if view == 'archive' }}>アーカイブ</a>
+          {% if is_manager %}
+          <a href="/team" class="{{ 'active' if view == 'team' }}" {{ 'aria-current=page' if view == 'team' }}>メンバー状況</a>
+          {% endif %}
+        </nav>
+      </div>
+      <div class="header-actions">
+        <div class="header-tools">
+          <button type="button" class="header-btn completion-effect-toggle" data-completion-effects-toggle aria-pressed="true">
+            完了演出 <span data-completion-effects-state>ON</span>
+          </button>
+          {# ブラウザが「アプリとしてインストール」できる状態のときだけ表示する #}
+          {% if SHOW_INSTALL_BUTTON %}<button type="button" class="header-btn" id="install-app" hidden>アプリとしてインストール</button>{% endif %}
+          <div class="theme-switch" role="group" aria-label="表示の明るさ">
+            <button type="button" data-theme-choice="auto" title="パソコンの設定に合わせる">自動</button>
+            <button type="button" data-theme-choice="light">ライト</button>
+            <button type="button" data-theme-choice="dark">ダーク</button>
+          </div>
+          <button type="button" class="header-btn" id="open-mini" title="今日やるタスクだけを小さな窓で開く">ミニ表示</button>
+          <span class="today-label">{{ today_label }}</span>
         </div>
-        <button type="button" class="header-btn" id="open-mini" title="今日やるタスクだけを小さな窓で開く">ミニ表示</button>
-        <span class="today-label">{{ today_label }}</span>
+        {% if development_login_enabled %}
+        <div class="dev-user-tools">
+          <span class="dev-user-label">開発: {{ current_user_name }}</span>
+          <a class="header-btn" href="/login">ユーザー切替</a>
+          <form method="post" action="/logout"><button type="submit" class="header-btn">ログアウト</button></form>
+        </div>
+        {% endif %}
       </div>
-      {% if development_login_enabled %}
-      <div class="dev-user-tools">
-        <span class="dev-user-label">開発: {{ current_user_name }}</span>
-        <a class="header-btn" href="/login">ユーザー切替</a>
-        <form method="post" action="/logout"><button type="submit" class="header-btn">ログアウト</button></form>
-      </div>
-      {% endif %}
     </div>
   </header>
   {% endblock %}
