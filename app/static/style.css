@@ -739,7 +739,7 @@ p.empty { margin: 0; border: 1px dashed var(--rule-strong); border-radius: var(-
 .project-management-empty { margin: 8px 0; color: var(--muted); font-size: 12px; }
 .filter-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
 
-/* ---------- WBS: 案件ごとの予定確認 ---------- */
+/* ---------- WBS: プロジェクトごとの予定確認 ---------- */
 .wbs-page { max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; }
 .wbs-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .wbs-heading h1 { margin: 0; font-size: 22px; }

@@ -99,9 +99,13 @@ def test_project_routes_connect_project_forms_and_task_rows(client, db_path):
     page = client.get("/")
     assert 'class="project-management"' in page.text
     assert 'id="quick-add-project-options"' in page.text
+    assert "プロジェクトを管理" in page.text
+    assert "新しいプロジェクト" in page.text
+    assert "プロジェクト未設定" in page.text
 
     created = client.post("/projects", data={"name": "移行準備"})
     assert "移行準備" in created.text
+    assert "プロジェクト「移行準備」を作成しました。" in created.text
     assert "hx-swap-oob=\"innerHTML\"" in created.text
     assert '<details class="project-management" open>' in created.text
 
@@ -114,7 +118,7 @@ def test_project_routes_connect_project_forms_and_task_rows(client, db_path):
     response = client.post("/tasks", data={
         "title": "受入テスト", "project_id": str(project_id), "destination": "today",
     })
-    assert "案件: 移行準備" in response.text
+    assert "プロジェクト: 移行準備" in response.text
 
     connection = database.connect(db_path)
     try:
@@ -123,14 +127,14 @@ def test_project_routes_connect_project_forms_and_task_rows(client, db_path):
         connection.close()
 
     child_response = client.post(f"/tasks/{parent_id}/subtasks", data={"title": "項目を確認"})
-    assert "案件: 移行準備" in child_response.text
+    assert "プロジェクト: 移行準備" in child_response.text
     renamed = client.post(f"/projects/{project_id}/rename", data={"name": "受入案件"})
-    assert "案件名を変更しました" in renamed.text
-    assert "案件: 受入案件" in renamed.text
+    assert "プロジェクト名を変更しました" in renamed.text
+    assert "プロジェクト: 受入案件" in renamed.text
 
     closed = client.post(f"/projects/{project_id}/status/closed")
     assert "関連タスクと記録は残っています" in closed.text
-    assert "案件: 受入案件" in closed.text
+    assert "プロジェクト: 受入案件" in closed.text
     assert "value=\"移行準備\"" not in closed.text
 
 

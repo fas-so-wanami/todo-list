@@ -1,4 +1,4 @@
-"""案件ごとのWBS表示に使う期間・タスク・信号を組み立てる。"""
+"""プロジェクトごとのWBS表示に使う期間・タスク・信号を組み立てる。"""
 import sqlite3
 from datetime import date, timedelta
 
@@ -101,7 +101,7 @@ def build_view(
     signal_filter: str = "all",
     search_query: str = "",
 ) -> dict:
-    """案件と期間を確認し、WBS画面が必要とする一覧データを返す。"""
+    """プロジェクトと期間を確認し、WBS画面が必要とする一覧データを返す。"""
     today = clock.today()
     week_start = _week_start(week, today)
     selected_mode = mode if mode in ("week", "day") else "week"

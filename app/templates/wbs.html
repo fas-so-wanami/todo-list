@@ -5,14 +5,14 @@
   <div class="wbs-heading">
     <div>
       <h1 id="wbs-title">WBS</h1>
-      <p>案件の予定と進み具合</p>
+      <p>プロジェクトの予定と進み具合</p>
     </div>
-    {% if project and project.status == 'closed' %}<span class="wbs-project-closed">終了案件</span>{% endif %}
+    {% if project and project.status == 'closed' %}<span class="wbs-project-closed">終了済みプロジェクト</span>{% endif %}
   </div>
 
   {% if projects %}
   <form class="wbs-filter-form" method="get" action="/wbs">
-    <label for="wbs-project">案件</label>
+    <label for="wbs-project">プロジェクト</label>
     <select id="wbs-project" name="project_id">
       {% for option in projects %}
       <option value="{{ option.id }}" {{ 'selected' if project and option.id == project.id }}>
@@ -112,12 +112,12 @@
   {% if total_task_count %}
   <p class="wbs-empty">条件に合うタスクがありません。絞り込みを解除するか、条件を変更してください。</p>
   {% else %}
-  <p class="wbs-empty">この案件にはタスクがありません。親タスクの編集から案件を設定できます。</p>
+  <p class="wbs-empty">このプロジェクトにはタスクがありません。親タスクの編集からプロジェクトを設定できます。</p>
   {% endif %}
   {% endif %}
   <p class="wbs-footnote">予定日はタスクの編集欄で変更できます。日付が未設定のタスクは予定バーと遅れ判定を表示しません。</p>
   {% else %}
-  <p class="wbs-empty">案件がありません。タスク画面から案件を作成してください。</p>
+  <p class="wbs-empty">プロジェクトがありません。タスク画面からプロジェクトを作成してください。</p>
   {% endif %}
 </section>
 {% endblock %}

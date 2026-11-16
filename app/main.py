@@ -365,7 +365,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         project_id: str = "", mode: str = "week", week: str = "",
         status: str = "all", signal: str = "all", q: str = "",
     ):
-        """案件内の親子タスクを、週または日の予定表として表示する。"""
+        """プロジェクト内の親子タスクを、週または日の予定表として表示する。"""
         user_id = request.state.user_id
         selected_project_id = None
         if project_id and project_id.isascii() and project_id.isdecimal() and len(project_id) <= 19:
@@ -532,7 +532,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         except projects.ProjectError as error:
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
         return render_board(
-            request, db, state, {"kind": "ok", "text": f"案件「{name.strip()}」を作成しました。"},
+            request, db, state, {"kind": "ok", "text": f"プロジェクト「{name.strip()}」を作成しました。"},
             highlight={"refresh_project_options": True, "project_management_open": True},
         )
 
@@ -547,7 +547,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         except projects.ProjectError as error:
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
         return render_board(
-            request, db, state, {"kind": "ok", "text": "案件名を変更しました。"},
+            request, db, state, {"kind": "ok", "text": "プロジェクト名を変更しました。"},
             highlight={"refresh_project_options": True, "project_management_open": True},
         )
 
@@ -557,12 +557,12 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     ):
         user_id = request.state.user_id
         if status not in ("active", "closed"):
-            return render_board(request, db, state, {"kind": "warn", "text": "案件の状態を選び直してください。"})
+            return render_board(request, db, state, {"kind": "warn", "text": "プロジェクトの状態を選び直してください。"})
         try:
             projects.set_project_closed(db, user_id, project_id, status == "closed")
         except projects.ProjectError as error:
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
-        notice_text = "案件を終了扱いにしました。関連タスクと記録は残っています。" if status == "closed" else "案件を再開しました。"
+        notice_text = "プロジェクトを終了扱いにしました。関連タスクと記録は残っています。" if status == "closed" else "プロジェクトを再開しました。"
         return render_board(
             request, db, state, {"kind": "ok", "text": notice_text},
             highlight={"refresh_project_options": True, "project_management_open": True},
@@ -598,11 +598,11 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         selected_project_id = None
         if project_id:
             if not project_id.isascii() or not project_id.isdecimal() or len(project_id) > 19:
-                return render_board(request, db, state, {"kind": "warn", "text": "案件を選び直してください。"})
+                return render_board(request, db, state, {"kind": "warn", "text": "プロジェクトを選び直してください。"})
             selected_project_id = int(project_id)
             selected_project = projects.get_owned_project(db, user_id, selected_project_id)
             if selected_project is None or selected_project["status"] != "active":
-                return render_board(request, db, state, {"kind": "warn", "text": "案件を選び直してください。"})
+                return render_board(request, db, state, {"kind": "warn", "text": "プロジェクトを選び直してください。"})
         today_iso = clock.today().isoformat()
         selected_due_date = due_date or (None if selected_parent_id is not None else today_iso)
         default_start_date = today_iso
@@ -806,13 +806,13 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             selected_project_id = None
             if project_id:
                 if not project_id.isascii() or not project_id.isdecimal() or len(project_id) > 19:
-                    raise projects.ProjectError("案件を選び直してください。")
+                    raise projects.ProjectError("プロジェクトを選び直してください。")
                 selected_project_id = int(project_id)
                 selected_project = projects.get_owned_project(db, user_id, selected_project_id)
                 if selected_project is None or (
                     selected_project["status"] != "active" and selected_project_id != task["project_id"]
                 ):
-                    raise projects.ProjectError("案件を選び直してください。終了案件へは移動できません。")
+                    raise projects.ProjectError("プロジェクトを選び直してください。終了したプロジェクトへは移動できません。")
             normalized_start_date = tasks.validate_start_date(start_date, due_date)
             tasks.update_task(
                 db, task_id, title=new_title[:200], due_date=tasks.normalize_due_date(due_date),
