@@ -250,7 +250,7 @@ def _add_start_date_column_if_missing(connection: sqlite3.Connection) -> None:
 
 
 def _add_project_id_column_if_missing(connection: sqlite3.Connection) -> None:
-    """既存タスクを未分類のまま保ち、案件との関連列だけを追加する。"""
+    """既存タスクを未分類のまま保ち、プロジェクトとの関連列だけを追加する。"""
     column_names = {row["name"] for row in connection.execute("PRAGMA table_info(tasks)")}
     if "project_id" not in column_names:
         connection.execute("ALTER TABLE tasks ADD COLUMN project_id INTEGER REFERENCES projects(id)")

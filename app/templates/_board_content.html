@@ -3,10 +3,10 @@
   {{ notice_box(notice) }}
 
   <details class="project-management" {{ 'open' if project_management_open }}>
-    <summary>案件を管理 <span class="count">{{ all_projects|length }} 件</span></summary>
+    <summary>プロジェクトを管理 <span class="count">{{ all_projects|length }} 件</span></summary>
     <div class="project-management-body">
       <form class="project-create-form" hx-post="/projects?{{ view_query }}">
-        <label>新しい案件 <input name="name" maxlength="100" required></label>
+        <label>新しいプロジェクト <input name="name" maxlength="100" required></label>
         <button type="submit" class="primary">作成</button>
       </form>
       {% if all_projects %}
@@ -15,8 +15,8 @@
         <li class="project-management-row">
           <span class="project-status">{{ '終了' if project.status == 'closed' else '進行中' }}</span>
           <form hx-post="/projects/{{ project.id }}/rename?{{ view_query }}">
-            <input name="name" value="{{ project.name }}" maxlength="100" required aria-label="{{ project.name }}の案件名">
-            <button type="submit" title="案件名を保存">名前変更</button>
+            <input name="name" value="{{ project.name }}" maxlength="100" required aria-label="{{ project.name }}のプロジェクト名">
+            <button type="submit" title="プロジェクト名を保存">名前変更</button>
           </form>
           <form hx-post="/projects/{{ project.id }}/status/{{ 'active' if project.status == 'closed' else 'closed' }}?{{ view_query }}">
             <button type="submit">{{ '再開' if project.status == 'closed' else '終了' }}</button>
@@ -25,7 +25,7 @@
         {% endfor %}
       </ul>
       {% else %}
-      <p class="project-management-empty">案件はまだありません。</p>
+      <p class="project-management-empty">プロジェクトはまだありません。</p>
       {% endif %}
     </div>
   </details>
@@ -65,7 +65,7 @@
         <li class="done-today-item">
           <span class="done-stamp" aria-label="完了">済</span>
           <span class="done-today-name">{{ task.title }}</span>
-          {% if task.project_name %}<span class="chip project-chip">案件: {{ task.project_name }}</span>{% endif %}
+          {% if task.project_name %}<span class="chip project-chip">プロジェクト: {{ task.project_name }}</span>{% endif %}
           {{ memo_chip(task) }}
           {% if task.parent_title %}<span class="parent-title">{{ task.parent_title }} ›</span>{% endif %}
           <button type="button" class="report-toggle{{ ' on' if task.is_in_report }}"
@@ -96,7 +96,7 @@
 </div>
 {% if refresh_project_options %}
 <select id="quick-add-project-options" hx-swap-oob="innerHTML">
-  <option value="">案件なし</option>
+  <option value="">プロジェクト未設定</option>
   {% for project in project_options %}<option value="{{ project.id }}">{{ project.name }}</option>{% endfor %}
 </select>
 {% endif %}

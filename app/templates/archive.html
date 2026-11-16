@@ -27,7 +27,7 @@
         <div class="archive-line">
           {% if not task.subtask_total %}<span class="done-stamp" aria-label="完了">済</span>{% endif %}
           <span class="title-text">{{ task.title }}</span>
-          {% if task.project_name %}<span class="chip project-chip">案件: {{ task.project_name }}</span>{% endif %}
+          {% if task.project_name %}<span class="chip project-chip">プロジェクト: {{ task.project_name }}</span>{% endif %}
           {{ memo_chip(task) }}
           {% if task.subtask_total %}{{ progress_summary(task) }}{% endif %}
           <button type="button" class="task-state-action"

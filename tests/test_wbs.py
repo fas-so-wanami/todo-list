@@ -163,7 +163,7 @@ def test_wbs_route_marks_closed_project_and_supports_day_mode(client, db_path):
 
     response = client.get(f"/wbs?project_id={project_id}&mode=day&week=2026-10-29")
 
-    assert "終了案件" in response.text
+    assert "終了済みプロジェクト" in response.text
     assert "日付なしタスク" in response.text
     assert "判定なし" in response.text
     assert "10/26(月)" in response.text

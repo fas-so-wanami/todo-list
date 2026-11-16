@@ -21,7 +21,7 @@ TAG_PATTERN = re.compile(r"#(\S+)")
 
 
 def split_title_and_tags(text: str) -> tuple[str, list[str]]:
-    """「資料作成 #案件A」のように入力された #タグ を取り出す。"""
+    """「資料作成 #確認」のように入力された #タグ を取り出す。"""
     tag_names = [name[:MAX_TAG_LENGTH] for name in dict.fromkeys(TAG_PATTERN.findall(text))][:MAX_TAGS_PER_TASK]
     title = TAG_PATTERN.sub("", text).strip()
     return re.sub(r"\s+", " ", title), tag_names
@@ -122,15 +122,15 @@ def create_task(
         if parent is None or parent["parent_id"] is not None:
             raise TaskRelationshipError("子を追加できる親タスクが見つかりません。親子は1段だけにできます。")
         if project_id is not None and project_id != parent["project_id"]:
-            raise TaskRelationshipError("子タスクは親タスクと同じ案件になります。")
+            raise TaskRelationshipError("子タスクは親タスクと同じプロジェクトになります。")
         project_id = parent["project_id"]
         parent_project = projects.get_owned_project(db, user_id, project_id) if project_id is not None else None
         if parent_project is not None and parent_project["status"] != "active" and not allow_closed_project_child:
-            raise TaskRelationshipError("終了した案件には子タスクを追加できません。")
+            raise TaskRelationshipError("終了したプロジェクトには子タスクを追加できません。")
         if recurrence_rule:
             raise TaskRelationshipError("子タスクの繰り返しは設定できません。親側で設定してください。")
     elif project_id is not None and projects.get_owned_project(db, user_id, project_id) is None:
-        raise TaskRelationshipError("選んだ案件が見つかりません。画面を読み直してください。")
+        raise TaskRelationshipError("選んだプロジェクトが見つかりません。画面を読み直してください。")
     cursor = db.execute(
         """INSERT INTO tasks (user_id, parent_id, project_id, title, importance, urgency, due_date, start_date,
                               memo, recurrence_rule, created_at)
@@ -165,7 +165,7 @@ class TaskRelationshipError(ValueError):
 
 
 def list_parent_candidates(db: sqlite3.Connection, user_id: int) -> list[sqlite3.Row]:
-    """絞り込み中も全案件から親を選べるよう、本人の未完了の親だけを返す。"""
+    """絞り込み中も全プロジェクトから親を選べるよう、本人の未完了の親だけを返す。"""
     return db.execute(
         "SELECT t.id, t.title FROM tasks t WHERE t.user_id = ? AND t.parent_id IS NULL "
         "AND t.status != 'done' AND (t.project_id IS NULL OR EXISTS ("
@@ -195,7 +195,7 @@ def change_parent(
             raise TaskRelationshipError("親には、本人の未完了の親タスクだけを選べます。")
         parent_project = projects.get_owned_project(db, user_id, parent["project_id"]) if parent["project_id"] else None
         if parent_project is not None and parent_project["status"] != "active":
-            raise TaskRelationshipError("終了した案件のタスクは親にできません。")
+            raise TaskRelationshipError("終了したプロジェクトのタスクは親にできません。")
         if db.execute(
             "SELECT 1 FROM tasks WHERE user_id = ? AND parent_id = ?", (user_id, task_id)
         ).fetchone():
@@ -217,18 +217,18 @@ def change_parent(
 def change_project(
     db: sqlite3.Connection, user_id: int, task_id: int, project_id: int | None,
 ) -> bool:
-    """親タスクと子を同じ案件へ移し、作業記録や日報はそのまま保つ。"""
+    """親タスクと子を同じプロジェクトへ移し、作業記録や日報はそのまま保つ。"""
     task = get_owned_task(db, user_id, task_id)
     if task is None:
         raise TaskRelationshipError("操作できるタスクが見つかりません。")
     if task["parent_id"] is not None:
-        raise TaskRelationshipError("子タスクの案件は親タスクから引き継ぎます。")
+        raise TaskRelationshipError("子タスクのプロジェクトは親タスクから引き継ぎます。")
     if task["project_id"] == project_id:
         return False
     if project_id is not None:
         project = projects.get_owned_project(db, user_id, project_id)
         if project is None or project["status"] != "active":
-            raise TaskRelationshipError("案件を選び直してください。終了した案件には移動できません。")
+            raise TaskRelationshipError("プロジェクトを選び直してください。終了したプロジェクトには移動できません。")
     db.execute(
         "UPDATE tasks SET project_id = ? WHERE user_id = ? AND (id = ? OR parent_id = ?)",
         (project_id, user_id, task_id, task_id),
