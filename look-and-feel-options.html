@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ToDo 見た目の小さな案 5つ</title>
+  <style>
+    :root {
+      --paper: #f4f6f9;
+      --grid: rgba(43, 74, 155, .035);
+      --sheet: #fff;
+      --sheet-2: #f8f9fb;
+      --ink: #1e2433;
+      --ink-2: #4a5266;
+      --muted: #646b7a;
+      --rule: #e3e7ee;
+      --rule-strong: #cfd5df;
+      --navy: #2b4a9b;
+      --navy-soft: #e8edf8;
+      --shu: #cf3a28;
+      --fusen: #ffe377;
+      --radius: 6px;
+      --row-space: 12px;
+      --section-space: 24px;
+      --font: "BIZ UDPGothic", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: #e9edf3;
+      font-family: var(--font);
+    }
+    :root[data-look="roomy"] { --row-space: 16px; --section-space: 30px; }
+    :root[data-look="paper"] { --paper: #f1f3f6; --grid: rgba(43, 74, 155, .055); --sheet-2: #f6f8fb; }
+    :root[data-look="contrast"] { --ink-2: #3d4658; --muted: #596274; --rule: #dce1e9; --rule-strong: #c4ccd8; }
+    :root[data-look="soft"] { --radius: 10px; --rule: #e9ecf1; --rule-strong: #d7dce5; }
+    :root[data-look="navy"] { --navy: #243f82; --navy-soft: #e5ebf8; --rule-strong: #c4cee1; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 760px; background: #e9edf3; }
+    button, input { font: inherit; }
+    .demo { max-width: 1320px; margin: auto; padding: 22px 24px 48px; }
+    .demo-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 14px; }
+    .eyebrow { margin: 0 0 4px; color: #647087; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+    h1 { margin: 0; font-size: 22px; }
+    .demo-head p:last-child { max-width: 560px; margin: 0; color: #586276; font-size: 12px; line-height: 1.7; }
+    .look-tabs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; padding: 5px; border: 1px solid #d7dce5; border-radius: 8px; background: #f5f6f9; }
+    .look-tabs button { padding: 7px 12px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: #525d73; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .look-tabs button[aria-pressed="true"] { border-color: #cbd4e7; background: white; color: #294681; box-shadow: 0 1px 3px #162b4c12; }
+    .look-summary { min-height: 22px; margin: 0 0 10px; color: #576176; font-size: 12px; }
+
+    /* Sample app frame: keep the current navigation and table-like task rows. */
+    .app { color: var(--ink); }
+    .app-header { position: sticky; top: 0; z-index: 3; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 3px 12px -8px #58627666; }
+    .app-header-inner { display: flex; align-items: stretch; gap: 26px; min-height: 52px; max-width: 1200px; margin: auto; padding: 0 20px; }
+    .header-navigation { display: flex; align-items: stretch; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 16px; font-weight: 700; white-space: nowrap; }
+    .brand-mark { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 4px; background: var(--navy); color: white; }
+    .brand-mark svg { width: 15px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .nav { display: flex; align-items: stretch; gap: 3px; }
+    .nav span { display: flex; align-items: center; padding: 0 11px; border-bottom: 3px solid transparent; color: var(--ink-2); font-size: 13px; white-space: nowrap; }
+    .nav .active { border-bottom-color: var(--navy); color: var(--navy); font-weight: 700; }
+    .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--ink-2); font-size: 11px; white-space: nowrap; }
+    .head-btn { padding: 4px 7px; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet); color: var(--ink-2); }
+    .date { margin-left: 2px; font-size: 12px; }
+    main { max-width: 1200px; margin: auto; padding: 24px 20px 34px; background-color: var(--paper); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 20px 20px; }
+    .quick-add-form { overflow: hidden; margin-bottom: 8px; border: 1px solid var(--rule-strong); border-top: 3px solid var(--navy); border-radius: var(--radius); background: var(--sheet); }
+    .quick-add { display: flex; align-items: center; gap: 12px; padding: 9px 14px; }
+    .quick-add input { flex: 1; min-width: 0; padding: 5px 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 14px; }
+    .quick-add .plus { color: var(--navy); font-size: 20px; font-weight: 500; }
+    .add-more { padding: 6px 14px; border-top: 1px dashed var(--rule-strong); background: var(--sheet-2); color: var(--navy); font-size: 11px; }
+    .project-management { margin: 10px 0 12px; color: var(--ink-2); font-size: 12px; }
+    .filter-bar { display: flex; align-items: center; gap: 7px; margin: 10px 0 18px; font-size: 11px; }
+    .filter-label { color: var(--muted); }
+    .filter { padding: 2px 8px; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet); color: var(--ink-2); }
+    .filter.on { border-color: var(--navy); background: var(--navy); color: white; }
+    .section { margin-bottom: var(--section-space); }
+    .section-head { display: flex; align-items: center; gap: 12px; min-height: 36px; margin-bottom: 10px; border-left: 3px solid var(--navy); padding-left: 12px; }
+    .section-head h2 { margin: 0; font-size: 19px; }
+    .count { padding: 2px 8px; border-radius: 4px; background: var(--sheet-2); color: var(--ink-2); font-size: 12px; font-weight: 400; }
+    .done-count, .report-count { color: var(--ink-2); font-size: 12px; }
+    .report-count { margin-left: auto; color: var(--navy); }
+    .task-columns, .task-line { display: grid; grid-template-columns: 50px 100px minmax(180px, 1fr) 72px 105px 110px 112px 35px; column-gap: 8px; align-items: center; }
+    .task-columns { position: sticky; top: 52px; z-index: 2; min-height: 35px; padding: 6px 12px 6px 20px; border: 1px solid var(--rule); border-bottom-color: var(--rule-strong); border-radius: var(--radius) var(--radius) 0 0; background: var(--sheet-2); color: var(--ink-2); font-size: 10px; }
+    .task-list { margin: 0; padding: 0; overflow: hidden; list-style: none; border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); background: var(--sheet); box-shadow: 0 4px 16px -12px #47536a88; }
+    .task { position: relative; padding: var(--row-space) 12px var(--row-space) 20px; border-top: 1px solid var(--rule); }
+    .task:first-child { border-top: 0; }
+    .task-line { align-items: start; color: var(--ink-2); font-size: 11px; }
+    .task-line > * { min-height: 28px; }
+    .stamp { align-self: center; padding: 2px 4px; border: 1px solid var(--rule-strong); border-radius: 3px; color: var(--navy); font-size: 9px; text-align: center; }
+    .progress { color: var(--ink-2); line-height: 1.6; }
+    .progress strong { display: block; color: var(--navy); font-size: 10px; }
+    .progress button { padding: 3px 6px; border: 1px solid var(--navy); border-radius: 4px; background: var(--navy); color: white; font-size: 9px; }
+    .title { min-width: 0; color: var(--ink); font-size: 12px; font-weight: 700; }
+    .sub { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; }
+    .child { padding-left: 28px; color: var(--ink-2); }
+    .child .title { font-weight: 500; }
+    .due { color: var(--ink-2); font-size: 10px; }
+    .levels { color: var(--ink-2); font-size: 9px; line-height: 1.8; }
+    .levels b { color: var(--navy); font-weight: 600; }
+    .state { color: var(--muted); font-size: 9px; line-height: 1.8; }
+    .state .blocked { color: #725b13; }
+    .move { color: var(--navy); font-size: 9px; white-space: nowrap; }
+    .edit { padding: 3px 5px; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet); color: var(--ink-2); font-size: 9px; }
+    .later { padding-top: 12px; border-top: 1px solid var(--rule-strong); }
+    .later summary { color: var(--ink-2); font-size: 15px; font-weight: 700; }
+    .later p { margin: 5px 0 0 20px; color: var(--muted); font-size: 11px; }
+
+    .afterword { margin-top: 24px; }
+    .afterword h2 { margin: 0 0 6px; font-size: 17px; }
+    .afterword > p { margin: 0 0 12px; color: #586276; font-size: 12px; }
+    .look-list, .ui-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .look-list li, .ui-list li { padding: 11px; border: 1px solid #d7dce5; border-radius: 6px; background: #f8f9fb; }
+    .look-list strong, .ui-list strong { display: block; margin-bottom: 4px; color: #273c70; font-size: 11px; }
+    .look-list span, .ui-list span { color: #5e687a; font-size: 10px; line-height: 1.6; }
+    .ui-ideas { margin-top: 24px; }
+    .small-note { margin-top: 10px !important; color: #6a7280 !important; }
+    @media (max-width: 1050px) {
+      .demo { padding: 16px; }
+      .demo-head { align-items: start; flex-direction: column; }
+      .header-actions .head-btn:first-child { display: none; }
+      .app-header-inner { gap: 12px; padding: 0 10px; }
+      .header-navigation { gap: 12px; }
+      .nav span { padding: 0 6px; }
+      .task-columns, .task-line { grid-template-columns: 40px 82px minmax(150px, 1fr) 62px 82px 86px 95px 30px; gap: 5px; }
+      .look-list, .ui-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo">
+    <header class="demo-head">
+      <div><p class="eyebrow">SMALL VISUAL TWEAKS / SAMPLE TASKS</p><h1>今の画面に寄せた、見た目の小さな案</h1></div>
+      <p>タブ・入力欄・今日やる一覧・列・タスクの並びは変えず、見た目だけを少しずつ動かします。上の選択肢を押して比べてみてください。</p>
+    </header>
+    <div class="look-tabs" role="group" aria-label="見た目の小さな案">
+      <button type="button" data-look="current" aria-pressed="true">現状に近い基準</button>
+      <button type="button" data-look="roomy" aria-pressed="false">1. 行に余白</button>
+      <button type="button" data-look="paper" aria-pressed="false">2. 紙色を調整</button>
+      <button type="button" data-look="contrast" aria-pressed="false">3. 文字をくっきり</button>
+      <button type="button" data-look="soft" aria-pressed="false">4. 枠をやわらかく</button>
+      <button type="button" data-look="navy" aria-pressed="false">5. 紺を少し強く</button>
+    </div>
+    <p class="look-summary" id="look-summary" aria-live="polite">基準：今の方眼・白い帳票・紺のタブをそのまま再現した見本。</p>
+
+    <div class="app">
+      <header class="app-header">
+        <div class="app-header-inner">
+          <div class="header-navigation">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>ToDo</div>
+            <nav class="nav" aria-label="画面切り替え"><span class="active">タスク</span><span>WBS</span><span>日報</span><span>アーカイブ</span></nav>
+          </div>
+          <div class="header-actions"><span class="head-btn">完了演出 ON</span><span class="head-btn">自動　ライト　ダーク</span><span class="head-btn">ミニ表示</span><span class="date">11月17日</span></div>
+        </div>
+      </header>
+      <main>
+        <div class="quick-add-form">
+          <div class="quick-add"><span class="plus">＋</span><input aria-label="タスクの入力" placeholder="今日やることを入力して Enter（例: 見積書作成 #確認）"></div>
+          <div class="add-more">＋　詳しく書く　　追加先・重要度・緊急性・期限・メモ</div>
+        </div>
+        <details class="project-management"><summary>プロジェクトを管理　3 件</summary></details>
+        <div class="filter-bar"><span class="filter-label">タグ</span><span class="filter on">すべて</span><span class="filter">#確認</span><span class="filter">#見積</span></div>
+        <section class="section">
+          <div class="section-head"><h2>今日やる</h2><span class="count">4 件</span><span class="done-count">今日完了 1 件</span><span class="report-count">日報に 2 件</span></div>
+          <div class="task-columns"><span>日報</span><span>進捗</span><span>タスク</span><span>期限</span><span>重要度・緊急性</span><span>状態</span><span>取り組む日</span><span></span></div>
+          <ul class="task-list">
+            <li class="task"><div class="task-line">
+              <span class="stamp">日報</span><span class="progress"><strong>進行中</strong>2/3件完了</span>
+              <span class="title">見積書を仕上げる<span class="sub">プロジェクト: 営業資料　　#確認　　メモ</span></span>
+              <span class="due">今日</span><span class="levels"><b>重要：高</b><br>緊急：中</span>
+              <span class="state">相談したい<br>返事待ち</span><span class="move">明日以降に ↓</span><button class="edit">編集</button>
+            </div></li>
+            <li class="task child"><div class="task-line">
+              <span class="stamp">日報</span><span class="progress">未着手<br><button>作業を始める</button></span>
+              <span class="title">金額の最終確認<span class="sub">└ 見積書を仕上げる の子タスク</span></span>
+              <span class="due">今日</span><span class="levels">重要：中<br>緊急：中</span>
+              <span class="state">相談したい<br>返事待ち</span><span class="move"></span><button class="edit">編集</button>
+            </div></li>
+            <li class="task"><div class="task-line">
+              <span class="stamp">日報</span><span class="progress">未着手<br><button>作業を始める</button></span>
+              <span class="title">週次ミーティングの準備<span class="sub">#定例</span></span>
+              <span class="due">11/18</span><span class="levels">重要：中<br>緊急：低</span>
+              <span class="state">相談したい<br>返事待ち</span><span class="move">明日以降に ↓</span><button class="edit">編集</button>
+            </div></li>
+          </ul>
+        </section>
+        <details class="later"><summary>明日以降にやる <span class="count">3 件</span></summary><p>期限が近い順</p></details>
+      </main>
+    </div>
+
+    <section class="afterword">
+      <h2>見た目だけの変更案</h2>
+      <p>上の5案はどれも、今の操作や画面構成を変えない小さな調整やで。</p>
+      <ol class="look-list">
+        <li><strong>1. 行に余白</strong><span>タスクの上下を少し広げる。行を追いやすくする代わりに、一画面に見える件数は減る。</span></li>
+        <li><strong>2. 紙色を調整</strong><span>方眼の地と帳票の白さをほんの少し変える。雰囲気は変わるけど配置はそのまま。</span></li>
+        <li><strong>3. 文字をくっきり</strong><span>見出し・薄い文字・罫線の差を少し強め、一覧を読み取りやすくする。</span></li>
+        <li><strong>4. 枠をやわらかく</strong><span>角丸と線を少しやさしくする。今の帳票感を残しながら印象を軽くする。</span></li>
+        <li><strong>5. 紺を少し強く</strong><span>今ある紺をタブや操作の目印にもう少し使う。新しい色は増やさない。</span></li>
+      </ol>
+    </section>
+
+    <section class="afterword ui-ideas">
+      <h2>UIの変更案（見た目以外も少し変える案）</h2>
+      <p>こっちは画面の見せ方・操作が変わる案。採用するなら、まず気になるものを選んでから個別に試すのがおすすめ。</p>
+      <ol class="ui-list">
+        <li><strong>A. 上部の操作を整理</strong><span>完了演出・テーマ・ミニ表示を「表示設定」にまとめ、日付とタブを見つけやすくする。</span></li>
+        <li><strong>B. 親子のまとまりを見やすく</strong><span>子タスクの字下げや親子の線を少し明確にし、折りたたみ状態も親の行で見つけやすくする。</span></li>
+        <li><strong>C. 明日以降の予告を足す</strong><span>閉じた段の見出しに、件数に加えて一番近い期限だけ小さく表示する。</span></li>
+        <li><strong>D. タグとプロジェクトをまとめる</strong><span>絞り込みや管理の欄を一か所に寄せて、タスク一覧までの見通しをよくする。</span></li>
+        <li><strong>E. タスク行の操作を見直す</strong><span>普段使わない操作を控えめにし、よく使う「作業を始める」「済」を見つけやすくする。</span></li>
+      </ol>
+      <p class="small-note">※このHTMLは方向を比べるための見本だけ。アプリ本体やルールは変更していません。色の細部はライト表示のサンプルです。</p>
+    </section>
+  </div>
+  <script>
+    const descriptions = {
+      current: "基準：今の方眼・白い帳票・紺のタブをそのまま再現した見本。",
+      roomy: "1. 行に余白：タスク行を少し縦に広げ、行を追いやすくします。表示件数は少し減ります。",
+      paper: "2. 紙色を調整：背景の方眼と帳票の白さだけをわずかに変えます。",
+      contrast: "3. 文字をくっきり：薄い文字と罫線を少し濃くし、読み取りやすくします。",
+      soft: "4. 枠をやわらかく：角丸を少し大きくし、線の印象を控えめにします。",
+      navy: "5. 紺を少し強く：既存の紺を少しだけ深め、操作箇所を見つけやすくします。"
+    };
+    const buttons = [...document.querySelectorAll("[data-look]")];
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const look = button.dataset.look;
+        if (look === "current") delete document.documentElement.dataset.look;
+        else document.documentElement.dataset.look = look;
+        buttons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+        document.querySelector("#look-summary").textContent = descriptions[look];
+      });
+    });
+  </script>
+</body>
+</html>

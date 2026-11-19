@@ -94,6 +94,7 @@ def build_view(
     db: sqlite3.Connection,
     user_id: int,
     *,
+    is_manager: bool = False,
     project_id: int | None = None,
     mode: str = "week",
     week: str | None = None,
@@ -111,8 +112,11 @@ def build_view(
     ) else "all"
     normalized_search = search_query.strip()[:100]
     search_key = normalized_search.casefold()
-    project_options = projects.list_projects(db, user_id)
-    selected_project = projects.get_owned_project(db, user_id, project_id) if project_id else None
+    project_options = projects.list_wbs_projects(db, user_id, is_manager=is_manager)
+    selected_project = (
+        projects.get_wbs_project(db, user_id, project_id, is_manager=is_manager)
+        if project_id else None
+    )
     if selected_project is None:
         selected_project = next(
             (project for project in project_options if project["status"] == "active"),
@@ -121,15 +125,39 @@ def build_view(
 
     periods = _periods(selected_mode, week_start, today)
     wbs_tasks = []
+    member_sections = []
     total_task_count = 0
     if selected_project is not None:
-        rows = db.execute(
-            "SELECT * FROM tasks WHERE user_id = ? AND project_id = ?",
-            (user_id, selected_project["id"]),
-        ).fetchall()
+        if selected_project["is_shared"]:
+            participants = [
+                member for member in projects.list_project_members(db, selected_project["id"])
+                if member["status"] == "accepted"
+            ]
+            participant_ids = sorted({
+                member["user_id"] for member in participants if member["user_id"] is not None
+            })
+            rows = []
+            if participant_ids:
+                placeholders = ",".join("?" for _ in participant_ids)
+                rows = db.execute(
+                    f"""SELECT t.*, u.name AS assignee_name FROM tasks t
+                        JOIN users u ON u.id = t.user_id
+                        WHERE t.project_id = ? AND t.user_id IN ({placeholders})""",
+                    [selected_project["id"], *participant_ids],
+                ).fetchall()
+        else:
+            rows = db.execute(
+                """SELECT t.*, u.name AS assignee_name FROM tasks t
+                   JOIN users u ON u.id = t.user_id
+                   WHERE t.user_id = ? AND t.project_id = ?""",
+                (user_id, selected_project["id"]),
+            ).fetchall()
         enriched_tasks = tasks.enrich(db, rows)
         total_task_count = len(enriched_tasks)
         for task in enriched_tasks:
+            if selected_project["is_shared"]:
+                for private_field in ("memo", "blocker_note", "waiting_note", "tags", "tag_text"):
+                    task.pop(private_field, None)
             task["schedule_label"], task["schedule_class"] = _schedule_signal(task, today)
             task["bar_cells"] = _bar_cells(task, periods)
         enriched_tasks = [
@@ -145,12 +173,33 @@ def build_view(
             task["due_date"] or "9999-12-31",
             task["id"],
         )
-        wbs_tasks = tasks.arrange_as_tree(enriched_tasks, sort_task, sort_task)
+        if selected_project["is_shared"]:
+            tasks_by_member: dict[int, list[dict]] = {}
+            for task in enriched_tasks:
+                tasks_by_member.setdefault(task["user_id"], []).append(task)
+            names_by_id = {member["user_id"]: member["name"] for member in participants}
+            ordered_member_ids = sorted(
+                names_by_id,
+                key=lambda member_id: (names_by_id[member_id], member_id),
+            )
+            for member_id in ordered_member_ids:
+                member_tasks = tasks.arrange_as_tree(
+                    tasks_by_member.get(member_id, []), sort_task, sort_task,
+                )
+                member_sections.append({
+                    "id": member_id,
+                    "name": names_by_id[member_id],
+                    "tasks": member_tasks,
+                })
+                wbs_tasks.extend(member_tasks)
+        else:
+            wbs_tasks = tasks.arrange_as_tree(enriched_tasks, sort_task, sort_task)
 
     return {
         "projects": project_options,
         "project": selected_project,
         "tasks": wbs_tasks,
+        "member_sections": member_sections,
         "total_task_count": total_task_count,
         "status_filter": selected_status_filter,
         "signal_filter": selected_signal_filter,

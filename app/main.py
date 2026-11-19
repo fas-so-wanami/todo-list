@@ -83,9 +83,9 @@ def get_db(request: Request) -> Generator[sqlite3.Connection, None, None]:
 Database: TypeAlias = Annotated[sqlite3.Connection, Depends(get_db, scope="function")]
 
 
-def view_state(tag: str = "", view: str = "") -> dict:
+def view_state(tag: str = "", view: str = "", q: str = "") -> dict:
     """どの画面から操作したか。ミニ表示(view=mini)から押した操作はミニ表示を描き直す。"""
-    return {"tag": tag, "view": view if view in ("mini", "archive") else "board"}
+    return {"tag": tag, "q": q.strip()[:100], "view": view if view in ("mini", "archive") else "board"}
 
 
 ViewState: TypeAlias = Annotated[dict, Depends(view_state)]
@@ -251,6 +251,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         params = {}
         if state["tag"]:
             params["tag"] = state["tag"]
+        if state.get("q"):
+            params["q"] = state["q"]
         if state.get("view") == "mini":
             params["view"] = "mini"
         return urlencode(params)
@@ -270,6 +272,14 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     ) -> dict:
         user_id = request.state.user_id
         report_task_ids = reports.report_task_ids(db, user_id, clock.today())
+        manageable_projects = projects.list_manageable_projects(
+            db, user_id, is_manager=request.state.is_manager,
+        )
+        project_members_by_id = {
+            project["id"]: projects.list_project_members(db, project["id"])
+            for project in manageable_projects
+            if project["is_shared"] and project["can_manage"]
+        }
         return {
             **base_context(request, "board"),
             "view_query": build_view_query(state),
@@ -282,15 +292,26 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             "just_flagged_id": (highlight or {}).get("flagged"),
             "just_waiting_id": (highlight or {}).get("waiting"),
             "edit_draft": (highlight or {}).get("edit_draft"),
-            "board": daily.build_board(db, user_id, report_task_ids, state["tag"] or None),
+            "board": daily.build_board(
+                db, user_id, report_task_ids, state["tag"] or None, state.get("q") or None,
+            ),
             "parent_candidates": tasks.list_parent_candidates(db, user_id),
-            "project_options": projects.list_projects(db, user_id, include_closed=False),
-            "all_projects": projects.list_projects(db, user_id),
+            "project_options": projects.list_assignable_projects(db, user_id),
+            "project_edit_options": projects.list_task_project_options(db, user_id),
+            "all_projects": manageable_projects,
+            "project_members_by_id": project_members_by_id,
+            "invite_candidates": auth.invitation_candidates(
+                db, auth_settings, exclude_email=request.state.user_email,
+            ),
+            "pending_project_invitations": projects.list_pending_invitations(
+                db, request.state.user_email,
+            ),
             "refresh_project_options": (highlight or {}).get("refresh_project_options", False),
             "project_management_open": (highlight or {}).get("project_management_open", False),
             "report_count": len(report_task_ids),
             "tag_names": tasks.list_tag_names(db, user_id),
             "selected_tag": state["tag"],
+            "search_query": state.get("q", ""),
         }
 
     def render_board(
@@ -310,7 +331,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.get("/mini", response_class=HTMLResponse)
     def mini_page(request: Request, db: Database):
         """今日やるタスクだけの小さな画面。小さな窓で開き、画面の端に置いて使う。"""
-        state = {"tag": "", "view": "mini"}
+        state = {"tag": "", "q": "", "view": "mini"}
         return templates.TemplateResponse(request, "mini.html", board_context(request, db, state))
 
     @app.get("/manifest.webmanifest")
@@ -372,7 +393,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         if project_id and project_id.isascii() and project_id.isdecimal() and len(project_id) <= 19:
             selected_project_id = int(project_id)
         view = wbs.build_view(
-            db, user_id, project_id=selected_project_id, mode=mode, week=week,
+            db, user_id, is_manager=request.state.is_manager,
+            project_id=selected_project_id, mode=mode, week=week,
             status_filter=status, signal_filter=signal, search_query=q,
         )
         view["filter_query"] = urlencode({
@@ -386,8 +408,9 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             f"{first_date.year}年{first_date.month}月{first_date.day}日から"
             f"{last_date.month}月{last_date.day}日"
         )
+        participant_column = "minmax(126px, .9fr) " if view["project"] and view["project"]["is_shared"] else ""
         view["grid_columns"] = (
-            f"minmax(260px, 2fr) minmax(126px, .9fr) "
+            f"minmax(260px, 2fr) {participant_column}minmax(126px, .9fr) "
             f"repeat({len(view['periods'])}, minmax(88px, 1fr))"
         )
         return templates.TemplateResponse(request, "wbs.html", {
@@ -571,15 +594,113 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return {"kind": "warn", "text": f"「{title}」のメモから困っている様子を検知し、相談中の付箋を付けました。違う場合は「解決した」で外せます。"}
 
     @app.post("/projects", response_class=HTMLResponse)
-    def create_project(request: Request, db: Database, state: ViewState, name: Annotated[str, Form()] = ""):
+    async def create_project(request: Request, db: Database, state: ViewState):
         user_id = request.state.user_id
+        form = await request.form()
+        name = str(form.get("name", ""))
+        is_shared = str(form.get("is_shared", ""))
+        invite_emails = [str(email) for email in form.getlist("invite_emails")]
         try:
-            project_id = projects.create_project(db, user_id, name)
+            projects.create_project(
+                db, user_id, name, is_shared=is_shared == "true",
+                invite_emails=invite_emails,
+                allowed_emails=auth.invitation_allowed_emails(auth_settings),
+            )
         except projects.ProjectError as error:
+            db.rollback()
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
+        invite_notice = (
+            f" 招待した{len(invite_emails)}人には、次回ログイン時にアプリ内で案内されます。"
+            if invite_emails else ""
+        )
         return render_board(
-            request, db, state, {"kind": "ok", "text": f"プロジェクト「{name.strip()}」を作成しました。"},
+            request, db, state, {
+                "kind": "ok", "text": f"プロジェクト「{name.strip()}」を作成しました。{invite_notice}",
+            },
             highlight={"refresh_project_options": True, "project_management_open": True},
+        )
+
+    @app.post("/projects/{project_id}/members", response_class=HTMLResponse)
+    async def add_project_members(
+        project_id: int, request: Request, db: Database, state: ViewState,
+    ):
+        form = await request.form()
+        invite_emails = [str(email) for email in form.getlist("invite_emails")]
+        try:
+            projects.add_project_members(
+                db, request.state.user_id, project_id, invite_emails,
+                allowed_emails=auth.invitation_allowed_emails(auth_settings),
+                is_manager=request.state.is_manager,
+            )
+        except projects.ProjectError as error:
+            db.rollback()
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)},
+                                highlight={"project_management_open": True})
+        return render_board(
+            request, db, state,
+            {"kind": "ok", "text": "選んだ利用者へ、アプリ内の招待を登録しました。"},
+            highlight={"project_management_open": True},
+        )
+
+    @app.post("/projects/{project_id}/invitations/revoke", response_class=HTMLResponse)
+    def revoke_project_invitation(
+        project_id: int, request: Request, db: Database, state: ViewState,
+        email: Annotated[str, Form()] = "",
+    ):
+        try:
+            projects.revoke_project_invitation(
+                db, request.state.user_id, project_id, email,
+                is_manager=request.state.is_manager,
+            )
+        except projects.ProjectError as error:
+            db.rollback()
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)},
+                                highlight={"project_management_open": True})
+        return render_board(
+            request, db, state, {"kind": "ok", "text": "保留中の招待を取り消しました。"},
+            highlight={"project_management_open": True},
+        )
+
+    @app.post("/projects/{project_id}/members/remove", response_class=HTMLResponse)
+    def remove_project_member(
+        project_id: int, request: Request, db: Database, state: ViewState,
+        email: Annotated[str, Form()] = "",
+    ):
+        try:
+            projects.remove_project_member(
+                db, request.state.user_id, project_id, email,
+                is_manager=request.state.is_manager,
+            )
+        except projects.ProjectError as error:
+            db.rollback()
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)},
+                                highlight={"project_management_open": True})
+        return render_board(
+            request, db, state,
+            {"kind": "ok", "text": "参加を解除しました。タスクはそのまま残し、共有WBSから非表示にしました。"},
+            highlight={"project_management_open": True, "refresh_project_options": True},
+        )
+
+    @app.post("/project-invitations/{project_id}/{decision}", response_class=HTMLResponse)
+    def respond_to_project_invitation(
+        project_id: int, decision: str, request: Request, db: Database, state: ViewState,
+    ):
+        if decision not in ("accept", "decline"):
+            return render_board(request, db, state, {"kind": "warn", "text": "招待への返答を選び直してください。"})
+        try:
+            projects.respond_to_invitation(
+                db, request.state.user_email, project_id, accept=decision == "accept",
+            )
+        except projects.ProjectError as error:
+            db.rollback()
+            return render_board(request, db, state, {"kind": "warn", "text": str(error)})
+        notice_text = (
+            "プロジェクトへの参加を承認しました。タスクの追加先とWBSから選べます。"
+            if decision == "accept" else "プロジェクトへの招待を辞退しました。"
+        )
+        return render_board(
+            request, db, state, {"kind": "ok", "text": notice_text},
+            highlight={"refresh_project_options": decision == "accept"},
         )
 
     @app.post("/projects/{project_id}/rename", response_class=HTMLResponse)
@@ -589,7 +710,9 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     ):
         user_id = request.state.user_id
         try:
-            projects.rename_project(db, user_id, project_id, name)
+            projects.rename_project(
+                db, user_id, project_id, name, is_manager=request.state.is_manager,
+            )
         except projects.ProjectError as error:
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
         return render_board(
@@ -605,7 +728,10 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         if status not in ("active", "closed"):
             return render_board(request, db, state, {"kind": "warn", "text": "プロジェクトの状態を選び直してください。"})
         try:
-            projects.set_project_closed(db, user_id, project_id, status == "closed")
+            projects.set_project_closed(
+                db, user_id, project_id, status == "closed",
+                is_manager=request.state.is_manager,
+            )
         except projects.ProjectError as error:
             return render_board(request, db, state, {"kind": "warn", "text": str(error)})
         notice_text = "プロジェクトを終了扱いにしました。関連タスクと記録は残っています。" if status == "closed" else "プロジェクトを再開しました。"
@@ -646,7 +772,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             if not project_id.isascii() or not project_id.isdecimal() or len(project_id) > 19:
                 return render_board(request, db, state, {"kind": "warn", "text": "プロジェクトを選び直してください。"})
             selected_project_id = int(project_id)
-            selected_project = projects.get_owned_project(db, user_id, selected_project_id)
+            selected_project = projects.get_assignable_project(db, user_id, selected_project_id)
             if selected_project is None or selected_project["status"] != "active":
                 return render_board(request, db, state, {"kind": "warn", "text": "プロジェクトを選び直してください。"})
         today_iso = clock.today().isoformat()
@@ -854,7 +980,11 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
                 if not project_id.isascii() or not project_id.isdecimal() or len(project_id) > 19:
                     raise projects.ProjectError("プロジェクトを選び直してください。")
                 selected_project_id = int(project_id)
-                selected_project = projects.get_owned_project(db, user_id, selected_project_id)
+                selected_project = projects.get_assignable_project(db, user_id, selected_project_id)
+                if selected_project is None and selected_project_id == task["project_id"]:
+                    existing_project = projects.get_project(db, selected_project_id)
+                    if existing_project is not None and existing_project["is_shared"]:
+                        selected_project = existing_project
                 if selected_project is None or (
                     selected_project["status"] != "active" and selected_project_id != task["project_id"]
                 ):

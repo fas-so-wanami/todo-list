@@ -18,10 +18,21 @@ CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
     name TEXT NOT NULL,
+    is_shared INTEGER NOT NULL DEFAULT 0 CHECK (is_shared IN (0, 1)),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed')),
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_projects_user_status ON projects(user_id, status);
+
+CREATE TABLE IF NOT EXISTS project_members (
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'declined', 'revoked', 'removed')),
+    invited_at TEXT NOT NULL,
+    responded_at TEXT,
+    PRIMARY KEY (project_id, email)
+);
+CREATE INDEX IF NOT EXISTS idx_project_members_email_status ON project_members(email, status);
 
 CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,6 +269,28 @@ def _add_project_id_column_if_missing(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE tasks ADD COLUMN project_id INTEGER REFERENCES projects(id)")
 
 
+def _add_project_shared_column_if_missing(connection: sqlite3.Connection) -> None:
+    """既存プロジェクトを個人用のまま保ち、チーム共有の印だけを追加する。"""
+    column_names = {row["name"] for row in connection.execute("PRAGMA table_info(projects)")}
+    if "is_shared" not in column_names:
+        connection.execute(
+            "ALTER TABLE projects ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0 "
+            "CHECK (is_shared IN (0, 1))"
+        )
+
+
+def _backfill_shared_project_members(connection: sqlite3.Connection) -> None:
+    """既存共有WBSの参加者を保ち、案件にタスクがある利用者を参加済みにする。"""
+    connection.execute(
+        """INSERT OR IGNORE INTO project_members (project_id, email, status, invited_at, responded_at)
+           SELECT DISTINCT p.id, lower(trim(u.email)), 'accepted', p.created_at, p.created_at
+           FROM projects p
+           JOIN tasks t ON t.project_id = p.id
+           JOIN users u ON u.id = t.user_id
+           WHERE p.is_shared = 1 AND u.email IS NOT NULL AND trim(u.email) != ''"""
+    )
+
+
 def _add_report_toggle_columns_if_missing(connection: sqlite3.Connection) -> None:
     """日報の「作業時間」「勤務形態・休暇」の入力ON/OFFの列が無い既存DBに列を追加する(初期値はON)。"""
     column_names = {row["name"] for row in connection.execute("PRAGMA table_info(daily_reports)")}
@@ -299,6 +332,8 @@ def init_db(db_path: Path | str) -> None:
         _add_waiting_column_if_missing(connection)
         _add_start_date_column_if_missing(connection)
         _add_project_id_column_if_missing(connection)
+        _add_project_shared_column_if_missing(connection)
+        _backfill_shared_project_members(connection)
         _add_report_toggle_columns_if_missing(connection)
         _add_report_snapshot_toggle_columns_if_missing(connection)
         connection.execute(

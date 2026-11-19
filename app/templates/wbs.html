@@ -1,5 +1,31 @@
 {% extends "base.html" %}
 {% block title %}WBS - ToDo{% endblock %}
+{% macro wbs_task_row(task) %}
+<div class="wbs-row wbs-task-row status-{{ task.status }}" role="row">
+  <div class="wbs-task-name depth-{{ task.depth }}" role="cell">
+    {% if task.depth %}<span class="wbs-tree-mark" aria-hidden="true">└</span>{% endif %}
+    {% if not task.depth and task.parent_id and task.parent_title %}<span class="wbs-parent-context">{{ task.parent_title }} ›</span>{% endif %}
+    <strong>{{ task.title }}</strong>
+    <span class="wbs-status status-{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
+    <span class="wbs-dates">{{ task.start_date or '開始日なし' }} ～ {{ task.due_date or '期限なし' }}</span>
+  </div>
+  {% if project.is_shared %}
+  <div class="wbs-assignee" role="cell">{{ task.assignee_name }}</div>
+  {% endif %}
+  <div class="wbs-signal signal-{{ task.schedule_class }}" role="cell">
+    <i class="wbs-dot {{ task.schedule_class }}" aria-hidden="true"></i>{{ task.schedule_label }}
+  </div>
+  {% for period in periods %}
+  <div class="wbs-period-cell" role="cell">
+    {% if period.today_position is not none %}
+    <span class="wbs-today-marker" style="--today-position: {{ period.today_position }}%" aria-hidden="true"></span>
+    {% endif %}
+    {% set bar_class = task.bar_cells[loop.index0] %}
+    {% if bar_class %}<span class="wbs-bar {{ bar_class }}{{ ' complete' if task.status == 'done' }}" aria-label="予定"></span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
 {% block content %}
 <section id="main-content" class="wbs-page" aria-labelledby="wbs-title">
   <div class="wbs-heading">
@@ -16,7 +42,7 @@
     <select id="wbs-project" name="project_id">
       {% for option in projects %}
       <option value="{{ option.id }}" {{ 'selected' if project and option.id == project.id }}>
-        {{ option.name }}{{ '（終了）' if option.status == 'closed' }}
+        {{ '共有: ' if option.is_shared else '' }}{{ option.name }}{{ '（終了）' if option.status == 'closed' }}
       </option>
       {% endfor %}
     </select>
@@ -67,11 +93,12 @@
     <span><i class="wbs-dot done"></i>完了</span>
   </div>
 
-  {% if tasks %}
+  {% if tasks or (project.is_shared and member_sections) %}
   <div class="wbs-scroll">
-    <div class="wbs-grid" role="table" aria-label="{{ project.name }}のWBS" style="--wbs-columns: {{ grid_columns }}">
+    <div class="wbs-grid{{ ' shared' if project.is_shared }}" role="table" aria-label="{{ project.name }}のWBS" style="--wbs-columns: {{ grid_columns }}">
       <div class="wbs-row wbs-header" role="row">
         <div role="columnheader">タスク</div>
+        {% if project.is_shared %}<div role="columnheader">担当者</div>{% endif %}
         <div role="columnheader">予定の状態</div>
         {% for period in periods %}
         <div role="columnheader">
@@ -83,29 +110,17 @@
         </div>
         {% endfor %}
       </div>
-      {% for task in tasks %}
-      <div class="wbs-row wbs-task-row status-{{ task.status }}" role="row">
-        <div class="wbs-task-name depth-{{ task.depth }}" role="cell">
-          {% if task.depth %}<span class="wbs-tree-mark" aria-hidden="true">└</span>{% endif %}
-          {% if not task.depth and task.parent_id and task.parent_title %}<span class="wbs-parent-context">{{ task.parent_title }} ›</span>{% endif %}
-          <strong>{{ task.title }}</strong>
-          <span class="wbs-status status-{{ task.status }}">{{ STATUS_LABELS[task.status] }}</span>
-          <span class="wbs-dates">{{ task.start_date or '開始日なし' }} ～ {{ task.due_date or '期限なし' }}</span>
-        </div>
-        <div class="wbs-signal signal-{{ task.schedule_class }}" role="cell">
-          <i class="wbs-dot {{ task.schedule_class }}" aria-hidden="true"></i>{{ task.schedule_label }}
-        </div>
-        {% for period in periods %}
-        <div class="wbs-period-cell" role="cell">
-          {% if period.today_position is not none %}
-          <span class="wbs-today-marker" style="--today-position: {{ period.today_position }}%" aria-hidden="true"></span>
-          {% endif %}
-          {% set bar_class = task.bar_cells[loop.index0] %}
-          {% if bar_class %}<span class="wbs-bar {{ bar_class }}{{ ' complete' if task.status == 'done' }}" aria-label="予定"></span>{% endif %}
-        </div>
-        {% endfor %}
+      {% if project.is_shared %}
+      {% for section in member_sections %}
+      <div class="wbs-member-row" role="row">
+        <div role="rowheader" style="grid-column: 1 / -1">{{ section.name }} <span>{{ section.tasks|length }} 件</span></div>
       </div>
+      {% for task in section.tasks %}{{ wbs_task_row(task) }}{% endfor %}
       {% endfor %}
+      {% else %}
+      {% for task in tasks %}{{ wbs_task_row(task) }}
+        {% endfor %}
+      {% endif %}
     </div>
   </div>
   {% else %}
@@ -115,7 +130,7 @@
   <p class="wbs-empty">このプロジェクトにはタスクがありません。親タスクの編集からプロジェクトを設定できます。</p>
   {% endif %}
   {% endif %}
-  <p class="wbs-footnote">予定日はタスクの編集欄で変更できます。日付が未設定のタスクは予定バーと遅れ判定を表示しません。</p>
+  <p class="wbs-footnote">{{ '共有WBSは閲覧専用です。予定日の変更は各自のタスク画面で行います。' if project.is_shared else '予定日はタスクの編集欄で変更できます。' }}日付が未設定のタスクは予定バーと遅れ判定を表示しません。</p>
   {% else %}
   <p class="wbs-empty">プロジェクトがありません。タスク画面からプロジェクトを作成してください。</p>
   {% endif %}

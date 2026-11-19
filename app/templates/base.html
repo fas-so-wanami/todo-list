@@ -285,6 +285,7 @@
       function restoreOthersSection() {
         const section = document.getElementById("others-section");
         if (!section) return;
+        if (section.dataset.searchActive === "true") return;
         try { section.open = localStorage.getItem(OTHERS_KEY) === "1"; } catch (error) { /* 保存できない環境では閉じたまま */ }
         section.addEventListener("toggle", function () {
           try { localStorage.setItem(OTHERS_KEY, section.open ? "1" : "0"); } catch (error) { /* 無視 */ }
@@ -359,6 +360,7 @@
   </script>
   <script src="/static/task-visibility.js?v={{ APP_VERSION }}"></script>
   <script src="/static/task-sort.js?v={{ APP_VERSION }}"></script>
+  <script src="/static/project-members.js?v={{ APP_VERSION }}"></script>
   <script src="/static/window-views.js?v={{ APP_VERSION }}"></script>
 </body>
 </html>

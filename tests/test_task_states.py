@@ -1,9 +1,11 @@
 """子の件数・状態から親の状態が決まることと、既存データの引き継ぎを確認する。"""
 from datetime import date
 from pathlib import Path
+import re
 import sqlite3
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app import daily, db as database, reports, tasks
 
@@ -227,6 +229,101 @@ def test_count_uses_all_children_even_when_filter_hides_some(db: sqlite3.Connect
     assert len(visible) == 1
     assert visible[0]["id"] == parent
     assert (visible[0]["subtask_done"], visible[0]["subtask_total"]) == (2, 5)
+
+
+def test_task_search_matches_title_tag_and_memo(db: sqlite3.Connection) -> None:
+    title_match = tasks.create_task(db, 1, "資料を見直す")
+    tag_match = tasks.create_task(db, 1, "会議", tag_names=["確認"])
+    memo_match = tasks.create_task(db, 1, "手順書を更新", memo="担当者へ共有する")
+    db.execute("INSERT INTO users (id, name) VALUES (?, ?)", (2, "別の利用者"))
+    tasks.create_task(db, 2, "資料を確認")
+
+    def visible_ids(query: str) -> list[int]:
+        board = daily.build_board(db, 1, set(), search_query=query)
+        return [task["id"] for task in board["today"] + board["others"]]
+
+    assert visible_ids("資料") == [title_match]
+    assert visible_ids("確認") == [tag_match]
+    assert visible_ids("共有") == [memo_match]
+
+
+def test_task_search_keeps_matching_families_together(db: sqlite3.Connection) -> None:
+    parent = tasks.create_task(db, 1, "資料作成")
+    first = tasks.create_task(db, 1, "下書き", parent_id=parent)
+    second = tasks.create_task(db, 1, "確認", parent_id=parent)
+    tasks.set_status(db, second, "done")
+
+    def rows(query: str) -> list[dict]:
+        board = daily.build_board(db, 1, set(), search_query=query)
+        return board["today"] + board["others"]
+
+    assert [(row["id"], row["depth"]) for row in rows("資料")] == [
+        (parent, 0), (first, 1), (second, 1),
+    ]
+    assert [(row["id"], row["depth"]) for row in rows("確認")] == [
+        (parent, 0), (second, 1),
+    ]
+
+
+def test_task_search_with_tag_keeps_context_but_filters_children(db: sqlite3.Connection) -> None:
+    parent = tasks.create_task(db, 1, "資料作成", tag_names=["案件"])
+    tagged = tasks.create_task(db, 1, "確認", parent_id=parent, tag_names=["案件"])
+    tasks.create_task(db, 1, "下書き", parent_id=parent)
+    other_parent = tasks.create_task(db, 1, "別の親")
+    other_child = tasks.create_task(db, 1, "確認", parent_id=other_parent, tag_names=["案件"])
+
+    board = daily.build_board(db, 1, set(), tag_name="案件", search_query="確認")
+    assert {row["id"] for row in board["today"] + board["others"]} == {
+        parent, tagged, other_parent, other_child,
+    }
+
+    board = daily.build_board(db, 1, set(), tag_name="案件", search_query="資料")
+    assert {row["id"] for row in board["today"] + board["others"]} == {parent, tagged}
+
+
+def test_task_search_opens_later_section_and_reveals_children(client: TestClient, db_path: Path) -> None:
+    connection = database.connect(db_path)
+    try:
+        parent = tasks.create_task(connection, 1, "未来の親", due_date="2099-12-31")
+        child = tasks.create_task(connection, 1, "未来の子", parent_id=parent)
+        connection.commit()
+    finally:
+        connection.close()
+
+    html = client.get("/", params={"q": "未来の親"}).text
+    assert 'id="others-section"\n           data-search-active="true" open' in html
+    assert f'data-child-controls="{parent}" data-search-active="true"' in html
+    assert f'data-task-id="{child}"' in html
+    assert "検索中は該当する子タスクを表示しています" in html
+
+
+def test_task_search_query_survives_task_actions(client: TestClient, db_path: Path) -> None:
+    connection = database.connect(db_path)
+    try:
+        task_id = tasks.create_task(connection, 1, "検索したい作業")
+        tasks.create_task(connection, 1, "別の作業")
+        connection.commit()
+    finally:
+        connection.close()
+
+    response = client.get("/?q=検索")
+    assert f'data-task-id="{task_id}"' in response.text
+    assert f"/tasks/{task_id}/status/doing?q=" in response.text
+
+
+def test_tag_filter_is_collapsed_until_a_tag_is_selected(client: TestClient, db_path: Path) -> None:
+    connection = database.connect(db_path)
+    try:
+        tasks.create_task(connection, 1, "タグ付きタスク", tag_names=["確認"])
+        connection.commit()
+    finally:
+        connection.close()
+
+    default_page = client.get("/")
+    selected_tag_page = client.get("/", params={"tag": "確認"})
+
+    assert re.search(r'<details class="tag-filter"\s*>', default_page.text)
+    assert re.search(r'<details class="tag-filter"\s+open>', selected_tag_page.text)
 
 
 def test_repeated_completion_does_not_duplicate_next_occurrence(db: sqlite3.Connection) -> None:

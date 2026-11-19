@@ -711,6 +711,30 @@ p.empty { margin: 0; border: 1px dashed var(--rule-strong); border-radius: var(-
 /* ---------- 一覧の絞り込み ---------- */
 
 .filter-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 14px 0; }
+.tag-filter {
+  margin: 10px 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius);
+}
+.tag-filter > summary, .project-member-management > summary {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; list-style: none;
+  color: var(--ink-2); font-size: 12px; font-weight: 700;
+}
+.tag-filter > summary::-webkit-details-marker, .project-member-management > summary::-webkit-details-marker { display: none; }
+.tag-filter > summary::after, .project-member-management > summary::after {
+  content: "▾"; margin-left: auto; font-size: 11px; transition: transform 0.2s var(--ease-out);
+}
+.tag-filter[open] > summary::after, .project-member-management[open] > summary::after { transform: rotate(180deg); }
+.tag-filter .count { padding: 1px 7px; border-radius: 4px; background: var(--sheet-2); font-size: 11px; }
+.tag-filter::details-content, .project-member-management::details-content {
+  block-size: 0; overflow: clip; opacity: 0;
+  transition: block-size 0.25s var(--ease-out), opacity 0.2s, content-visibility 0.25s allow-discrete;
+}
+.tag-filter[open]::details-content, .project-member-management[open]::details-content { block-size: auto; opacity: 1; }
+.tag-filter .filter-bar { padding: 0 12px 10px; margin: 0; }
+.task-search-form {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0;
+}
+.task-search-form label { color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.task-search-form input { width: min(360px, 100%); }
 .project-management {
   margin-bottom: 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius);
 }
@@ -729,17 +753,52 @@ p.empty { margin: 0; border: 1px dashed var(--rule-strong); border-radius: var(-
 .project-management[open]::details-content { block-size: auto; opacity: 1; }
 .project-management-body { padding: 0 12px 10px; }
 .project-create-form, .project-management-row, .project-management-row form { display: flex; align-items: center; gap: 8px; }
-.project-create-form { padding: 10px 0; border-top: 1px solid var(--rule); }
+.project-create-form { flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--rule); }
 .project-create-form label { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 12px; }
-.project-create-form input { width: min(320px, 42vw); }
+.project-create-form input[name="name"] { width: min(320px, 42vw); }
+.project-create-form .project-shared-choice {
+  display: inline-flex; align-items: center; gap: 9px; padding: 8px 12px; border: 1px solid var(--navy);
+  border-radius: var(--radius); background: var(--navy-soft); color: var(--navy); font-size: 14px; font-weight: 700;
+  cursor: pointer;
+}
+.project-shared-choice input[type="checkbox"] {
+  width: 18px; height: 18px; margin: 0; accent-color: var(--navy); cursor: pointer;
+}
+.project-create-form [data-shared-invite-area] { flex: 1 0 100%; }
+.project-invite-picker { display: grid; grid-template-columns: minmax(180px, 260px) minmax(260px, 1fr); gap: 6px 10px; align-items: start; }
+.project-invite-picker > label { display: grid !important; gap: 4px !important; font-size: 12px !important; }
+.project-invite-picker input[type="search"] { width: 100%; }
+.project-invite-picker select { min-width: 260px; min-height: 92px; }
+.project-invite-help { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
 .project-management-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
-.project-management-row { min-height: 42px; border-bottom: 1px solid var(--rule); }
-.project-management-row:last-child { border-bottom: 0; }
+.project-management-entry { padding: 6px 0; border-bottom: 1px solid var(--rule); }
+.project-management-entry:last-child { border-bottom: 0; }
+.project-management-row { min-height: 42px; }
 .project-management-row form:first-of-type { flex: 1; }
 .project-management-row input { width: min(100%, 360px); }
 .project-management-row button { padding: 4px 8px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--sheet); color: var(--ink-2); font-size: 12px; }
 .project-management-row button:hover { border-color: var(--rule-strong); color: var(--ink); background: var(--hover); }
 .project-status { min-width: 46px; color: var(--muted); font-size: 11px; }
+.project-scope { min-width: 38px; color: var(--navy); font-size: 11px; font-weight: 700; }
+.project-readonly-name { flex: 1; color: var(--ink-2); font-size: 13px; }
+.project-member-readonly { margin: 0 0 4px 92px; color: var(--muted); font-size: 11px; }
+.project-member-management { margin-left: 46px; border-left: 2px solid var(--navy-soft); }
+.project-member-management > summary { justify-content: flex-start; padding: 6px 10px; }
+.project-member-management > summary::after { margin-left: 0; }
+.project-member-management .count { padding: 1px 7px; border-radius: 4px; background: var(--sheet-2); font-size: 11px; }
+.project-member-list { margin: 0; padding: 0 10px 8px; list-style: none; }
+.project-member-list li { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.project-member-list li > span:first-child { min-width: 120px; color: var(--ink); }
+.project-member-list li > span:nth-child(2) { flex: 1; color: var(--muted); }
+.project-member-list form { margin: 0; }
+.project-member-list button, .project-add-members-form > button:not(.primary) { padding: 5px 9px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--sheet); color: var(--ink-2); font-size: 11px; }
+.project-add-members-form { display: flex; align-items: end; gap: 10px; padding: 0 10px 10px; }
+.project-add-members-form .project-invite-picker { flex: 1; }
+.project-invitations { margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--navy); border-radius: var(--radius); background: var(--navy-soft); }
+.project-invitations h2 { margin: 0 0 6px; color: var(--navy); font-size: 14px; }
+.project-invitation-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.project-invitation-row p { flex: 1; margin: 0; color: var(--ink-2); font-size: 13px; }
+.project-invitation-row form { margin: 0; }
 .project-management-empty { margin: 8px 0; color: var(--muted); font-size: 12px; }
 .filter-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
 
@@ -777,6 +836,11 @@ p.empty { margin: 0; border: 1px dashed var(--rule-strong); border-radius: var(-
 .wbs-grid { min-width: 980px; }
 .wbs-row { display: grid; grid-template-columns: var(--wbs-columns); }
 .wbs-row > div { min-width: 0; border-bottom: 1px solid var(--rule); }
+.wbs-member-row > div {
+  padding: 9px 14px; border-bottom: 1px solid var(--rule); background: var(--navy-soft);
+  color: var(--navy); font-size: 13px; font-weight: 700;
+}
+.wbs-member-row span { margin-left: 6px; color: var(--ink-2); font-size: 11px; font-weight: 400; }
 .wbs-header { background: var(--sheet-2); color: var(--ink-2); font-size: 12px; font-weight: 700; }
 .wbs-header > div { position: relative; padding: 10px 8px; }
 .wbs-today-marker {
@@ -792,6 +856,7 @@ p.empty { margin: 0; border: 1px dashed var(--rule-strong); border-radius: var(-
 .wbs-task-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 10px 8px 10px 14px; }
 .wbs-task-name.depth-1 { padding-left: 32px; }
 .wbs-task-name strong { font-size: 13px; font-weight: 600; }
+.wbs-assignee { display: flex; align-items: center; padding: 10px 8px; color: var(--ink-2); font-size: 12px; }
 .wbs-tree-mark { margin-left: -12px; color: var(--muted); }
 .wbs-parent-context { color: var(--muted); font-size: 11px; }
 .wbs-status { padding: 1px 5px; background: var(--wait-bg); color: var(--ink-2); font-size: 10px; white-space: nowrap; }
