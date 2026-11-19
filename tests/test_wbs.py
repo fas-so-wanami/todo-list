@@ -206,3 +206,57 @@ def test_wbs_route_applies_filters_and_keeps_them_when_switching_period(client, 
     assert "別の未完了" not in response.text
     assert "完了項目" not in response.text
     assert f"mode=week&amp;week=2026-10-26&amp;status=open&amp;signal=late&amp;q=API" in response.text
+
+
+def test_shared_wbs_groups_participants_and_keeps_private_memo_out(db):
+    db.executemany(
+        "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+        [
+            (2, "メンバーA", "member-a@example.test"),
+            (3, "メンバーB", "member-b@example.test"),
+            (4, "見学者", "viewer@example.test"),
+        ],
+    )
+    project_id = projects.create_project(db, 1, "共有案件", is_shared=True)
+    for email in ("member-a@example.test", "member-b@example.test"):
+        projects.add_project_members(
+            db, 1, project_id, [email], allowed_emails={email},
+        )
+        projects.respond_to_invitation(db, email, project_id, accept=True)
+    tasks.create_task(
+        db, 2, "Aの作業", project_id=project_id, memo="個人メモ",
+        start_date="2026-10-29", due_date="2026-11-06",
+    )
+    tasks.create_task(
+        db, 3, "Bの作業", project_id=project_id,
+        start_date="2026-10-30", due_date="2026-11-07",
+    )
+
+    view = wbs.build_view(db, 2, project_id=project_id)
+    manager_view = wbs.build_view(db, 4, project_id=project_id, is_manager=True)
+    outsider_view = wbs.build_view(db, 4, project_id=project_id)
+
+    assert [section["name"] for section in view["member_sections"]] == ["メンバーA", "メンバーB", "自分"]
+    assert [task["title"] for task in view["tasks"]] == ["Aの作業", "Bの作業"]
+    assert [task["assignee_name"] for task in view["tasks"]] == ["メンバーA", "メンバーB"]
+    assert all("memo" not in task and "blocker_note" not in task for task in view["tasks"])
+    assert manager_view["project"]["id"] == project_id
+    assert outsider_view["project"] is None
+
+
+def test_shared_project_tasks_inherit_shared_project_to_children(db):
+    db.execute(
+        "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+        (2, "別のメンバー", "member@example.test"),
+    )
+    shared_id = projects.create_project(db, 1, "共有親子", is_shared=True)
+    projects.add_project_members(
+        db, 1, shared_id, ["member@example.test"], allowed_emails={"member@example.test"},
+    )
+    projects.respond_to_invitation(db, "member@example.test", shared_id, accept=True)
+    parent = tasks.create_task(db, 2, "共有の親", project_id=shared_id)
+    child = tasks.create_task(db, 2, "共有の子", parent_id=parent)
+
+    assert db.execute("SELECT project_id FROM tasks WHERE id = ?", (child,)).fetchone()[0] == shared_id
+    view = wbs.build_view(db, 2, project_id=shared_id)
+    assert [task["id"] for task in view["tasks"]] == [parent, child]

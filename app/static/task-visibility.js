@@ -34,7 +34,7 @@
   function applyVisibility() {
     document.querySelectorAll("[data-child-controls]").forEach(function (controls) {
       const parentId = controls.dataset.childControls;
-      const mode = readMode(parentId);
+      const mode = controls.dataset.searchActive === "true" ? "all" : readMode(parentId);
       const parent = controls.closest("[data-task-id]");
       const children = Array.from(parent.parentElement.children).filter(function (row) {
         return row.dataset.parentId === parentId;

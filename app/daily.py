@@ -175,7 +175,8 @@ def _lingering_done_subtasks(db: sqlite3.Connection, user_id: int, today_iso: st
 
 
 def build_board(
-    db: sqlite3.Connection, user_id: int, report_task_ids: set[int], tag_name: str | None = None
+    db: sqlite3.Connection, user_id: int, report_task_ids: set[int], tag_name: str | None = None,
+    search_query: str | None = None,
 ) -> dict:
     """タスク画面の「今日やる」「明日以降にやる」の2段を組み立てる。待ちのタスクは各段の後ろに回す。
     親子は必ず同じ段に置く。未完了の子が1つでも今日やるなら、親とその子をまとめて今日やるに出す。"""
@@ -200,9 +201,30 @@ def build_board(
     today_tasks = [task for task in tasks_by_id.values() if family_root_id(task) in today_root_ids]
     other_tasks = [task for task in tasks_by_id.values() if family_root_id(task) not in today_root_ids]
 
-    if tag_name:
-        today_tasks = [task for task in today_tasks if tag_name in task["tags"]]
-        other_tasks = [task for task in other_tasks if tag_name in task["tags"]]
+    normalized_search_query = (search_query or "").strip().casefold()
+    def matches_tag(task: dict) -> bool:
+        return not tag_name or tag_name in task["tags"]
+
+    def matches_search(task: dict) -> bool:
+        searchable_text = " ".join([task["title"], task["memo"] or "", *task["tags"]]).casefold()
+        return normalized_search_query in searchable_text
+
+    if normalized_search_query:
+        matched_ids = {
+            task["id"] for task in tasks_by_id.values()
+            if matches_tag(task) and matches_search(task)
+        }
+        visible_ids = set(matched_ids)
+        for task in tasks_by_id.values():
+            if task["id"] in matched_ids and task["parent_id"] in tasks_by_id:
+                visible_ids.add(task["parent_id"])
+            if task["parent_id"] in matched_ids and matches_tag(task):
+                visible_ids.add(task["id"])
+    else:
+        visible_ids = {task["id"] for task in tasks_by_id.values() if matches_tag(task)}
+
+    today_tasks = [task for task in today_tasks if task["id"] in visible_ids]
+    other_tasks = [task for task in other_tasks if task["id"] in visible_ids]
 
     for task in today_tasks + other_tasks:
         task["is_in_report"] = task["id"] in report_task_ids
@@ -222,7 +244,7 @@ def build_board(
     # today_tasks の中だけでなく list_done_today の全件を使うことで、
     # 「明日以降にやる」の段にいた子タスクが完了した場合も漏れなく拾う。
     done_today_flat = sorted(
-        done_today,
+        (task for task in done_today if task["id"] in visible_ids),
         key=lambda task: task["completed_at"],
     )
     for task in done_today_flat:

@@ -57,6 +57,36 @@ def allowed_member_emails(settings: AuthSettings) -> list[str]:
     return sorted(emails - settings.manager_emails)
 
 
+def invitation_allowed_emails(settings: AuthSettings) -> set[str]:
+    """招待先になれる、ログイン許可済みメールを返す。"""
+    allowed_emails = set(settings.allowed_emails | settings.manager_emails)
+    if settings.mode == "dev":
+        allowed_emails.update(email for email, _ in development_user_specs(settings))
+    return allowed_emails
+
+
+def invitation_candidates(
+    connection: sqlite3.Connection, settings: AuthSettings, *, exclude_email: str | None = None,
+) -> list[dict]:
+    """招待できる許可済み利用者を名前・メール付きで返す。まだ登録前ならメールを表示名にする。"""
+    allowed_emails = invitation_allowed_emails(settings)
+    allowed_emails.discard(normalize_email(exclude_email))
+    if not allowed_emails:
+        return []
+
+    users_by_email = {
+        normalize_email(row["email"]): row["name"]
+        for row in connection.execute("SELECT name, email FROM users WHERE email IS NOT NULL")
+    }
+    return sorted(
+        (
+            {"email": email, "name": users_by_email.get(email) or email.partition("@")[0]}
+            for email in allowed_emails
+        ),
+        key=lambda candidate: (candidate["name"].casefold(), candidate["email"]),
+    )
+
+
 def load_settings() -> AuthSettings:
     """起動モードに応じて設定を検証し、危険な認証抜けを防ぐ。"""
     mode = os.getenv("TODO_AUTH_MODE", "local").strip().lower()

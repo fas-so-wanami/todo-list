@@ -1,26 +1,89 @@
-{% from "_macros.html" import task_row, task_columns_header, notice_box, memo_chip with context %}
+{% from "_macros.html" import task_row, task_columns_header, notice_box, memo_chip, invite_selector with context %}
 <div id="main-content" data-refresh-url="/content?{{ view_query }}">
   {{ notice_box(notice) }}
+
+  {% if pending_project_invitations %}
+  <section class="project-invitations" aria-labelledby="project-invitations-title">
+    <h2 id="project-invitations-title">プロジェクトへの招待</h2>
+    {% for invitation in pending_project_invitations %}
+    <div class="project-invitation-row">
+      <p><strong>{{ invitation.project_name }}</strong> — {{ invitation.inviter_name }}さんからの招待</p>
+      <form hx-post="/project-invitations/{{ invitation.project_id }}/accept?{{ view_query }}">
+        <button type="submit" class="primary">参加する</button>
+      </form>
+      <form hx-post="/project-invitations/{{ invitation.project_id }}/decline?{{ view_query }}">
+        <button type="submit">辞退する</button>
+      </form>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
 
   <details class="project-management" {{ 'open' if project_management_open }}>
     <summary>プロジェクトを管理 <span class="count">{{ all_projects|length }} 件</span></summary>
     <div class="project-management-body">
       <form class="project-create-form" hx-post="/projects?{{ view_query }}">
         <label>新しいプロジェクト <input name="name" maxlength="100" required></label>
+        <label class="project-shared-choice">
+          <input type="checkbox" name="is_shared" value="true" data-shared-checkbox> チームで共有する
+        </label>
+        <div data-shared-invite-area hidden>
+          {{ invite_selector(invite_candidates, "プロジェクト作成時に招待する利用者") }}
+        </div>
         <button type="submit" class="primary">作成</button>
       </form>
       {% if all_projects %}
       <ul class="project-management-list">
         {% for project in all_projects %}
-        <li class="project-management-row">
-          <span class="project-status">{{ '終了' if project.status == 'closed' else '進行中' }}</span>
-          <form hx-post="/projects/{{ project.id }}/rename?{{ view_query }}">
-            <input name="name" value="{{ project.name }}" maxlength="100" required aria-label="{{ project.name }}のプロジェクト名">
-            <button type="submit" title="プロジェクト名を保存">名前変更</button>
-          </form>
-          <form hx-post="/projects/{{ project.id }}/status/{{ 'active' if project.status == 'closed' else 'closed' }}?{{ view_query }}">
-            <button type="submit">{{ '再開' if project.status == 'closed' else '終了' }}</button>
-          </form>
+        <li class="project-management-entry">
+          <div class="project-management-row">
+            <span class="project-scope">{{ '共有' if project.is_shared else '個人' }}</span>
+            <span class="project-status">{{ '終了' if project.status == 'closed' else '進行中' }}</span>
+            {% if project.can_manage %}
+            <form hx-post="/projects/{{ project.id }}/rename?{{ view_query }}">
+              <input name="name" value="{{ project.name }}" maxlength="100" required aria-label="{{ project.name }}のプロジェクト名">
+              <button type="submit" title="プロジェクト名を保存">名前変更</button>
+            </form>
+            <form hx-post="/projects/{{ project.id }}/status/{{ 'active' if project.status == 'closed' else 'closed' }}?{{ view_query }}">
+              <button type="submit">{{ '再開' if project.status == 'closed' else '終了' }}</button>
+            </form>
+            {% else %}
+            <span class="project-readonly-name">{{ project.name }}（参加中・管理は作成者と上司のみ）</span>
+            {% endif %}
+          </div>
+          {% if project.is_shared and project.can_manage %}
+          {% set project_members = project_members_by_id[project.id] %}
+          <details class="project-member-management">
+            <summary>参加者・招待を管理 <span class="count">{{ project_members|length }} 人</span></summary>
+            <ul class="project-member-list">
+              {% for member in project_members %}
+              <li>
+                <span>{{ member.name }}{% if member.is_owner %}（作成者）{% elif member.status == 'pending' %}（招待中）{% endif %}</span>
+                <span>{{ member.email or 'メール未設定' }}</span>
+                {% if not member.is_owner %}
+                {% if member.status == 'pending' %}
+                <form hx-post="/projects/{{ project.id }}/invitations/revoke?{{ view_query }}">
+                  <input type="hidden" name="email" value="{{ member.email }}">
+                  <button type="submit">招待を取り消す</button>
+                </form>
+                {% else %}
+                <form hx-post="/projects/{{ project.id }}/members/remove?{{ view_query }}">
+                  <input type="hidden" name="email" value="{{ member.email }}">
+                  <button type="submit">参加解除</button>
+                </form>
+                {% endif %}
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            <form class="project-add-members-form" hx-post="/projects/{{ project.id }}/members?{{ view_query }}">
+              {{ invite_selector(invite_candidates, project.name ~ "に招待する利用者") }}
+              <button type="submit" class="primary">招待する</button>
+            </form>
+          </details>
+          {% elif project.is_shared %}
+          <p class="project-member-readonly">共有WBSの参加者です。プロジェクトの管理操作はできません。</p>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>
@@ -30,14 +93,27 @@
     </div>
   </details>
 
+  <form class="task-search-form" action="/" method="get" role="search">
+    {% if selected_tag %}<input type="hidden" name="tag" value="{{ selected_tag }}">{% endif %}
+    <label for="task-search">タスクを検索</label>
+    <input id="task-search" name="q" type="search" value="{{ search_query }}" maxlength="100"
+           placeholder="タスク名・タグ・メモ">
+    <button type="submit">検索</button>
+    {% if search_query %}
+    <a class="chip filter" href="/{{ '?tag=' + (selected_tag|urlencode) if selected_tag else '' }}">検索を解除</a>
+    {% endif %}
+  </form>
+
   {% if tag_names %}
-  <div class="filter-bar" role="navigation" aria-label="タグで絞り込み">
-    <span class="filter-label">タグ</span>
-    <a class="chip filter{{ ' on' if not selected_tag }}" href="/">すべて</a>
-    {% for tag_name in tag_names %}
-    <a class="chip filter{{ ' on' if selected_tag == tag_name }}" href="/?tag={{ tag_name|urlencode }}">#{{ tag_name }}</a>
-    {% endfor %}
-  </div>
+  <details class="tag-filter" {{ 'open' if selected_tag }}>
+    <summary>タグで絞り込む <span class="count">{{ tag_names|length }} 件</span>{% if selected_tag %}<span class="chip filter on">選択中: #{{ selected_tag }}</span>{% endif %}</summary>
+    <div class="filter-bar" role="navigation" aria-label="タグで絞り込み">
+      <a class="chip filter{{ ' on' if not selected_tag }}" href="/{{ '?q=' + (search_query|urlencode) if search_query else '' }}">すべて</a>
+      {% for tag_name in tag_names %}
+      <a class="chip filter{{ ' on' if selected_tag == tag_name }}" href="/?tag={{ tag_name|urlencode }}{{ '&q=' + (search_query|urlencode) if search_query else '' }}">#{{ tag_name }}</a>
+      {% endfor %}
+    </div>
+  </details>
   {% endif %}
 
     <section class="section board-section">
@@ -82,7 +158,8 @@
   </section>
 
     {% if board.others %}
-  <details class="section board-section others{% if board.done_today %} no-top-border{% endif %}" id="others-section">
+  <details class="section board-section others{% if board.done_today %} no-top-border{% endif %}" id="others-section"
+           data-search-active="{{ 'true' if search_query|trim else 'false' }}" {{ 'open' if search_query|trim }}>
     <summary class="section-head">
       <h2>明日以降にやる <span class="count">{{ board.others|length }} 件</span></h2>
       <p class="section-note">期限が近い順</p>
@@ -97,6 +174,6 @@
 {% if refresh_project_options %}
 <select id="quick-add-project-options" hx-swap-oob="innerHTML">
   <option value="">プロジェクト未設定</option>
-  {% for project in project_options %}<option value="{{ project.id }}">{{ project.name }}</option>{% endfor %}
+  {% for project in project_options %}<option value="{{ project.id }}">{{ '共有: ' if project.is_shared else '' }}{{ project.name }}</option>{% endfor %}
 </select>
 {% endif %}

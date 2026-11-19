@@ -17,15 +17,35 @@
 {% if task.memo and task.memo|trim %}<span class="chip memo-chip" title="{{ task.memo }}">メモ</span>{% endif %}
 {% endmacro %}
 
+{% macro invite_selector(candidates, selector_label) %}
+<div class="project-invite-picker" data-invite-picker>
+  <label>名前またはメールで探す
+    <input type="search" data-invite-search placeholder="名前・メールアドレス">
+  </label>
+  {% if candidates %}
+  <select name="invite_emails" multiple size="4" data-invite-options aria-label="{{ selector_label }}">
+    {% for candidate in candidates %}
+    <option value="{{ candidate.email }}">{{ candidate.name }}（{{ candidate.email }}）</option>
+    {% endfor %}
+  </select>
+  <span class="project-invite-help">複数選択できます。Windowsでは Ctrl キーを押しながら選んでください。</span>
+  {% else %}
+  <span class="project-invite-help">招待できる利用者がいません。ログイン許可リストを確認してください。</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
 {% macro child_visibility(task) %}
 {% if task.subtask_total %}
-<div class="child-visibility" data-child-controls="{{ task.id }}">
+{% set searching = search_query|default('', true)|trim %}
+<div class="child-visibility" data-child-controls="{{ task.id }}" data-search-active="{{ 'true' if searching else 'false' }}">
   <span class="child-inventory">子タスク {{ task.subtask_total }}件・完了 {{ task.subtask_done }}件</span>
   <div class="child-modes" role="group" aria-label="{{ task.title }}の子タスク表示">
     {% for mode, label in [('all', '全部表示'), ('done', '完了だけしまう'), ('none', '全部しまう')] %}
-    <button type="button" data-child-mode="{{ mode }}" aria-pressed="{{ 'true' if mode == 'done' else 'false' }}">{{ label }}</button>
+    <button type="button" data-child-mode="{{ mode }}" aria-pressed="{{ 'true' if mode == ('all' if searching else 'done') else 'false' }}" {{ 'disabled' if searching }}>{{ label }}</button>
     {% endfor %}
   </div>
+  {% if searching %}<span>検索中は該当する子タスクを表示しています</span>{% endif %}
   <span class="child-hidden-count" data-child-hidden-count aria-live="polite"></span>
   <span class="child-alerts" data-child-alerts></span>
   <span class="child-storage-notice" data-child-storage-notice role="status" hidden></span>
@@ -253,8 +273,8 @@
         <label>プロジェクト
           <select name="project_id">
             <option value="" {{ 'selected' if not edit_values.project_id }}>プロジェクト未設定</option>
-            {% for project in all_projects %}
-            <option value="{{ project.id }}" {{ 'selected' if edit_values.project_id|string == project.id|string }} {{ 'disabled' if project.status == 'closed' and edit_values.project_id|string != project.id|string }}>{{ project.name }}{{ '（終了）' if project.status == 'closed' }}</option>
+            {% for project in project_edit_options %}
+            <option value="{{ project.id }}" {{ 'selected' if edit_values.project_id|string == project.id|string }} {{ 'disabled' if (project.status == 'closed' or not project.can_assign) and edit_values.project_id|string != project.id|string }}>{{ '共有: ' if project.is_shared else '' }}{{ project.name }}{{ '（終了）' if project.status == 'closed' }}{{ '（参加解除済み・既存タスクのみ）' if not project.can_assign }}</option>
             {% endfor %}
           </select>
         </label>
@@ -356,7 +376,7 @@
         <select name="project_id" id="quick-add-project-options">
           <option value="">プロジェクト未設定</option>
           {% for project in project_options %}
-          <option value="{{ project.id }}">{{ project.name }}</option>
+          <option value="{{ project.id }}">{{ '共有: ' if project.is_shared else '' }}{{ project.name }}</option>
           {% endfor %}
         </select>
       </label>
