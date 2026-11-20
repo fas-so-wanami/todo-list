@@ -2,6 +2,15 @@
 <div id="main-content" data-refresh-url="/content?{{ view_query }}">
   {{ notice_box(notice) }}
 
+  {% if due_today_tasks %}
+  <aside class="due-today-notice" role="status">
+    <p>今日が期限の未完了タスクがあります。</p>
+    <ul>
+      {% for task in due_today_tasks %}<li>{{ task.title }}</li>{% endfor %}
+    </ul>
+  </aside>
+  {% endif %}
+
   {% if pending_project_invitations %}
   <section class="project-invitations" aria-labelledby="project-invitations-title">
     <h2 id="project-invitations-title">プロジェクトへの招待</h2>

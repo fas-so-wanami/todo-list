@@ -83,6 +83,46 @@ def test_board_defaults_to_due_date_order_in_both_sections(db) -> None:
     assert [task["title"] for task in board["others"]] == ["後日・期限前", "後日・期限後", "後日・期限なし"]
 
 
+def test_board_notifies_unfinished_tasks_due_today_only(client: TestClient, db_path: Path) -> None:
+    connection = database.connect(db_path)
+    try:
+        due_today = tasks.create_task(connection, 1, "今日が期限", due_date="2026-10-29")
+        deferred_today = tasks.create_task(connection, 1, "今日が期限・明日以降", due_date="2026-10-29")
+        tasks.create_task(connection, 1, "昨日が期限", due_date="2026-10-28")
+        tasks.create_task(connection, 1, "明日が期限", due_date="2026-10-30")
+        completed_today = tasks.create_task(connection, 1, "完了・今日が期限", due_date="2026-10-29")
+        tasks.set_status(connection, completed_today, "done")
+        daily.move_to_later(connection, deferred_today)
+        connection.commit()
+    finally:
+        connection.close()
+
+    response = client.get("/")
+    notice = re.search(
+        r'<aside class="due-today-notice"[^>]*>.*?</aside>', response.text, re.DOTALL,
+    )
+    assert notice is not None
+    assert "今日が期限" in notice.group()
+    assert "今日が期限・明日以降" in notice.group()
+    assert "昨日が期限" not in notice.group()
+    assert "明日が期限" not in notice.group()
+    assert "完了・今日が期限" not in notice.group()
+    assert 'class="due-today-notice"' not in client.get("/mini").text
+
+
+def test_board_hides_due_today_notice_when_no_unfinished_tasks_are_due_today(
+    client: TestClient, db_path: Path,
+) -> None:
+    connection = database.connect(db_path)
+    try:
+        tasks.create_task(connection, 1, "期限超過", due_date="2026-10-28")
+        connection.commit()
+    finally:
+        connection.close()
+
+    assert 'class="due-today-notice"' not in client.get("/").text
+
+
 def test_quick_add_uses_today_when_due_date_is_blank(client: TestClient, db_path: Path) -> None:
     client.post("/tasks", data={"title": "期限欄を空にして追加", "due_date": ""})
     connection = database.connect(db_path)

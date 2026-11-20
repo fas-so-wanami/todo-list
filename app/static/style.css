@@ -623,6 +623,13 @@ button.large { padding: 12px 28px; font-size: 16px; }
 .move-btn.to-today { background: var(--navy-soft); border-color: transparent; }
 
 /* 相談中・返事待ちの一言(タスク名の下に付箋として出す) */
+.due-today-notice {
+  margin: 0 0 16px; padding: 10px 14px;
+  border: 1px solid var(--rule); border-left: 4px solid var(--navy);
+  background: var(--sheet-2); color: var(--ink);
+}
+.due-today-notice p { margin: 0 0 4px; font-weight: 700; }
+.due-today-notice ul { margin: 0; padding-left: 1.25em; }
 .row-note { margin-top: 6px; }
 .row-note > summary {
   display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
@@ -632,6 +639,11 @@ button.large { padding: 12px 28px; font-size: 16px; }
 .note-label { font-weight: 700; white-space: nowrap; }
 .note-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .note-text.is-blank { opacity: 0.75; }
+.wait-note > summary { align-items: flex-start; }
+.wait-note .note-text {
+  flex: 1 1 auto; overflow: visible; overflow-wrap: anywhere;
+  text-overflow: clip; white-space: normal;
+}
 .note-since { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .note-edit { font-size: 12px; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
 .fusen-note > summary {

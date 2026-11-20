@@ -280,6 +280,13 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             for project in manageable_projects
             if project["is_shared"] and project["can_manage"]
         }
+        board = daily.build_board(
+            db, user_id, report_task_ids, state["tag"] or None, state.get("q") or None,
+        )
+        due_today_tasks = [
+            task for task in [*board["today"], *board["others"]]
+            if task["status"] != "done" and task["is_due_today"]
+        ]
         return {
             **base_context(request, "board"),
             "view_query": build_view_query(state),
@@ -292,9 +299,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             "just_flagged_id": (highlight or {}).get("flagged"),
             "just_waiting_id": (highlight or {}).get("waiting"),
             "edit_draft": (highlight or {}).get("edit_draft"),
-            "board": daily.build_board(
-                db, user_id, report_task_ids, state["tag"] or None, state.get("q") or None,
-            ),
+            "board": board,
+            "due_today_tasks": due_today_tasks,
             "parent_candidates": tasks.list_parent_candidates(db, user_id),
             "project_options": projects.list_assignable_projects(db, user_id),
             "project_edit_options": projects.list_task_project_options(db, user_id),
