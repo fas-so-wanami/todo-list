@@ -244,6 +244,46 @@ def test_shared_wbs_groups_participants_and_keeps_private_memo_out(db):
     assert outsider_view["project"] is None
 
 
+def test_shared_wbs_renders_open_member_sections_with_independent_storage_keys(client, db_path):
+    connection = database.connect(db_path)
+    try:
+        project_id = projects.create_project(connection, 1, "開閉確認案件", is_shared=True)
+        member_ids = {}
+        for name, email in (
+            ("メンバーA", "collapse-a-wbs@example.test"),
+            ("メンバーB", "collapse-b-wbs@example.test"),
+        ):
+            cursor = connection.execute(
+                "INSERT INTO users (name, email) VALUES (?, ?)", (name, email),
+            )
+            member_ids[email] = cursor.lastrowid
+            projects.add_project_members(
+                connection, 1, project_id, [email], allowed_emails={email},
+            )
+            projects.respond_to_invitation(connection, email, project_id, accept=True)
+        tasks.create_task(connection, 1, "作成者のタスク", project_id=project_id)
+        tasks.create_task(
+            connection, member_ids["collapse-a-wbs@example.test"], "メンバーAのタスク",
+            project_id=project_id,
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    response = client.get(f"/wbs?project_id={project_id}")
+
+    assert response.status_code == 200
+    assert response.text.count('data-wbs-member-section') == 3
+    assert response.text.count('class="wbs-member-section" open') == 3
+    assert f'data-project-id="{project_id}"' in response.text
+    assert 'data-member-id="1"' in response.text
+    assert "メンバーA" in response.text
+    assert "メンバーB" in response.text
+    assert "メンバーAのタスク" in response.text
+    assert "作成者のタスク" in response.text
+    assert "0 件" in response.text
+
+
 def test_shared_project_tasks_inherit_shared_project_to_children(db):
     db.execute(
         "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",

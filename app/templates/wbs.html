@@ -71,6 +71,9 @@
   </form>
 
   <p class="wbs-filter-count" aria-live="polite">{{ tasks|length }} / {{ total_task_count }} 件を表示</p>
+  {% if project and project.is_shared %}
+  <p class="wbs-visibility-notice" data-wbs-visibility-notice role="status" aria-live="polite" hidden></p>
+  {% endif %}
 
   <div class="wbs-controls">
     <div class="wbs-mode" role="group" aria-label="表示単位">
@@ -112,10 +115,14 @@
       </div>
       {% if project.is_shared %}
       {% for section in member_sections %}
-      <div class="wbs-member-row" role="row">
-        <div role="rowheader" style="grid-column: 1 / -1">{{ section.name }} <span>{{ section.tasks|length }} 件</span></div>
-      </div>
-      {% for task in section.tasks %}{{ wbs_task_row(task) }}{% endfor %}
+      <details class="wbs-member-section" open role="rowgroup" data-wbs-member-section
+               data-project-id="{{ project.id }}" data-member-id="{{ section.id }}">
+        <summary class="wbs-member-row" role="row">
+          <span role="rowheader">{{ section.name }}</span>
+          <span>{{ section.tasks|length }} 件</span>
+        </summary>
+        {% for task in section.tasks %}{{ wbs_task_row(task) }}{% endfor %}
+      </details>
       {% endfor %}
       {% else %}
       {% for task in tasks %}{{ wbs_task_row(task) }}
